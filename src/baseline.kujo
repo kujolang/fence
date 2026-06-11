@@ -1,0 +1,99 @@
+// src/baseline.kujo
+// Baseline support: let existing repos adopt Fence without failing on
+// pre-existing violations. A baseline is a deterministic list of violation
+// fingerprints stored in `fence-baseline.json`. `check --baseline` suppresses
+// violations whose fingerprint is baselined; NEW violations still fail.
+
+from src.util import arr_has, sort_strings, dict_has
+
+func baseline_path() {
+    return "fence-baseline.json"
+}
+
+export func baseline_file() {
+    return baseline_path()
+}
+
+// Stable identity for a violation: from_zone|to_zone|file|import.
+// Severity is intentionally excluded so re-tuning severities does not orphan a
+// baseline entry.
+export func fingerprint(v) {
+    return v["from_zone"] + "|" + v["to_zone"] + "|" + v["file"] + "|" + v["import"]
+}
+
+// Build a sorted, deduplicated baseline object from an analysis result.
+export func baseline_from_result(result) {
+    let viols = result["violations"]
+    let n = len(viols)
+    mut fps = []
+    mut i = 0
+    while i < n {
+        let fp = fingerprint(viols[i])
+        if arr_has(fps, fp) == false {
+            fps = push(fps, fp)
+        }
+        i = i + 1
+    }
+    return {
+        "schema_version": 1,
+        "tool": "fence",
+        "fingerprints": sort_strings(fps)
+    }
+}
+
+// Serialize a baseline object to JSON text.
+export func render_baseline(obj) {
+    return to_json_pretty(obj)
+}
+
+// Load fence-baseline.json. Returns { found, ok, fingerprints }.
+export func load_baseline() {
+    let path = baseline_path()
+    if file_exists(path) == false {
+        return { "found": false, "ok": true, "fingerprints": [] }
+    }
+    let raw = read_file(path)
+    mut parsed = {}
+    mut ok = true
+    try {
+        parsed = parse_json(raw)
+    } except e {
+        ok = false
+    }
+    if ok == false {
+        return { "found": true, "ok": false, "fingerprints": [] }
+    }
+    mut fps = []
+    if dict_has(parsed, "fingerprints") {
+        fps = parsed["fingerprints"]
+    }
+    return { "found": true, "ok": true, "fingerprints": fps }
+}
+
+// Remove violations whose fingerprint is in the baseline. Returns a new result
+// plus the suppressed count.
+export func apply_baseline(result, fingerprints) {
+    let viols = result["violations"]
+    let n = len(viols)
+    mut kept = []
+    mut suppressed = 0
+    mut i = 0
+    while i < n {
+        let v = viols[i]
+        if arr_has(fingerprints, fingerprint(v)) {
+            suppressed = suppressed + 1
+        } else {
+            kept = push(kept, v)
+        }
+        i = i + 1
+    }
+    return {
+        "result": {
+            "files_scanned": result["files_scanned"],
+            "imports_checked": result["imports_checked"],
+            "zone_files": result["zone_files"],
+            "violations": kept
+        },
+        "suppressed": suppressed
+    }
+}

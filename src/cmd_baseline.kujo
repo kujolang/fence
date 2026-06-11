@@ -1,0 +1,51 @@
+// src/cmd_baseline.kujo
+// Implements `fence baseline create`.
+
+from src.config import load_config
+from src.validate import validate_config, count_errors
+from src.walk import walk
+from src.analyze import analyze_files
+from src.baseline import baseline_from_result, render_baseline, baseline_file
+from src.output import write_safe
+
+export func cmd_baseline(parsed) {
+    let positionals = parsed["positionals"]
+    if len(positionals) == 0 {
+        print("Usage: kujo run fence.kujo -- baseline create")
+        return 2
+    }
+    let sub = positionals[0]
+    if sub != "create" {
+        print("Unknown baseline subcommand: " + sub)
+        print("Available: create")
+        return 2
+    }
+
+    let loaded = load_config()
+    if loaded["found"] == false {
+        print("No fence.toml found. Run: kujo run fence.kujo -- init")
+        return 2
+    }
+    if loaded["ok"] == false {
+        print("Config error: " + loaded["error"])
+        return 3
+    }
+    let cfg = loaded["config"]
+    if count_errors(validate_config(cfg)) > 0 {
+        print("Config is invalid. Run `kujo run fence.kujo -- validate` for details.")
+        return 2
+    }
+
+    let files = walk(cfg["source_roots"], cfg["include"], cfg["exclude"])
+    let result = analyze_files(files, cfg)
+    let obj = baseline_from_result(result)
+
+    let w = write_safe(baseline_file(), render_baseline(obj), true)
+    if w["ok"] == false {
+        print("Error: " + w["error"])
+        return 5
+    }
+    print("Wrote " + baseline_file() + " with " + to_string(len(obj["fingerprints"])) + " baselined violation(s).")
+    print("Future `check --baseline` runs will suppress these and fail only on NEW violations.")
+    return 0
+}

@@ -1,0 +1,118 @@
+// src/config.kujo
+// Load and normalize Fence configuration.
+//
+// Primary format is `fence.toml` (Kujo's parse_toml handles the nested
+// [zones.*] tables and arrays used by Fence). `fence.json` is supported as a
+// secondary fallback for environments that prefer JSON.
+
+from src.util import dict_has, dict_get
+
+// Locate a config file. Returns "" when none exists.
+export func find_config_path() {
+    if file_exists("fence.toml") {
+        return "fence.toml"
+    }
+    if file_exists("fence.json") {
+        return "fence.json"
+    }
+    return ""
+}
+
+// Load configuration. Returns a dict:
+//   { found: bool, path: string, ok: bool, error: string, config: dict }
+// `ok` is false (with `error` set) on parse failure; `found` is false when no
+// config file exists at all.
+export func load_config() {
+    let path = find_config_path()
+    if path == "" {
+        return make_load_result(false, "", false, "no config file found", {})
+    }
+
+    let raw = read_file(path)
+    mut parsed = {}
+    mut parse_ok = true
+    mut parse_err = ""
+
+    if ends_with(path, ".json") {
+        try {
+            parsed = parse_json(raw)
+        } except e {
+            parse_ok = false
+            parse_err = "invalid JSON in " + path
+        }
+    } else {
+        try {
+            parsed = parse_toml(raw)
+        } except e {
+            parse_ok = false
+            parse_err = "invalid TOML in " + path
+        }
+    }
+
+    if parse_ok == false {
+        return make_load_result(true, path, false, parse_err, {})
+    }
+
+    let cfg = normalize_config(parsed)
+    return make_load_result(true, path, true, "", cfg)
+}
+
+func make_load_result(found, path, ok, error, config) {
+    return {
+        "found": found,
+        "path": path,
+        "ok": ok,
+        "error": error,
+        "config": config
+    }
+}
+
+// Fill defaults and guarantee a stable shape for downstream code.
+export func normalize_config(raw) {
+    mut cfg = {}
+
+    cfg["version"] = dict_get(raw, "version", 1)
+    cfg["source_roots"] = dict_get(raw, "source_roots", ["src"])
+    cfg["default_severity"] = dict_get(raw, "default_severity", "error")
+    cfg["fail_on"] = dict_get(raw, "fail_on", "error")
+    cfg["unknown_dependency_policy"] = dict_get(raw, "unknown_dependency_policy", "warn")
+
+    let scan = dict_get(raw, "scan", {})
+    cfg["include"] = dict_get(scan, "include", [])
+    cfg["exclude"] = dict_get(scan, "exclude", [])
+
+    cfg["aliases"] = dict_get(raw, "aliases", {})
+
+    // Optional external dependency allow/deny lists.
+    let ext = dict_get(raw, "external", {})
+    cfg["external_allow"] = dict_get(ext, "allow", [])
+    cfg["external_deny"] = dict_get(ext, "deny", [])
+
+    let zones = dict_get(raw, "zones", {})
+    cfg["zones"] = normalize_zones(zones)
+    cfg["zone_names"] = keys(cfg["zones"])
+
+    return cfg
+}
+
+// Ensure every zone has the expected fields with sane defaults.
+func normalize_zones(zones) {
+    let names = keys(zones)
+    let n = len(names)
+    mut out = {}
+    mut i = 0
+    while i < n {
+        let name = names[i]
+        let z = zones[name]
+        mut zn = {}
+        zn["paths"] = dict_get(z, "paths", [])
+        zn["can_depend_on"] = dict_get(z, "can_depend_on", [])
+        zn["cannot_depend_on"] = dict_get(z, "cannot_depend_on", [])
+        zn["severity"] = dict_get(z, "severity", "error")
+        zn["external_allow"] = dict_get(z, "external_allow", [])
+        zn["external_deny"] = dict_get(z, "external_deny", [])
+        out[name] = zn
+        i = i + 1
+    }
+    return out
+}

@@ -1,0 +1,99 @@
+// src/analyze.kujo
+// Core analysis pipeline: walk -> extract -> resolve -> map zone -> apply rules.
+//
+// Loop variables here use unique names (fi/fc, mi/mc) so that callee helpers
+// (which use plain i/n internally) cannot alias and corrupt the loop counters.
+
+from src.imports import detect_imports
+from src.resolve import resolve_import
+from src.zones import match_zone
+from src.rules import check_dependency, make_violation, check_external, make_external_violation
+from src.util import dict_get, dict_has
+
+// Analyze a list of files against the config. Returns:
+//   {
+//     files_scanned, imports_checked,
+//     violations: [...],
+//     zone_files: { zone: count },
+//     ambiguous: [ { file, zones } ]
+//   }
+export func analyze_files(files, cfg) {
+    let zones = cfg["zones"]
+    let zone_names = cfg["zone_names"]
+    let roots = cfg["source_roots"]
+    let aliases = cfg["aliases"]
+
+    mut violations = []
+    mut zone_files = {}
+    mut imports_checked = 0
+
+    let fc = len(files)
+    mut fi = 0
+    while fi < fc {
+        let file = files[fi]
+        let file_zone = match_zone(file, zones, zone_names)
+        zone_files = bump(zone_files, file_zone)
+
+        let imps = detect_imports(file)
+        let mc = len(imps)
+        mut mi = 0
+        while mi < mc {
+            let imp = imps[mi]
+            imports_checked = imports_checked + 1
+            // Only files that belong to a known zone are governed.
+            if file_zone != "unknown" {
+                let res = resolve_import(imp["path"], file, roots, aliases)
+                let v = judge(file, file_zone, imp, res, cfg, zones, zone_names)
+                if dict_has(v, "severity") {
+                    violations = push(violations, v)
+                }
+            }
+            mi = mi + 1
+        }
+        fi = fi + 1
+    }
+
+    return {
+        "files_scanned": fc,
+        "imports_checked": imports_checked,
+        "violations": violations,
+        "zone_files": zone_files
+    }
+}
+
+// Evaluate one resolved import. Returns a violation record, or 0 when allowed
+// / not applicable.
+func judge(file, file_zone, imp, res, cfg, zones, zone_names) {
+    let status = res["status"]
+
+    // External packages: allowed by default, unless an allow/deny list applies.
+    if status == "external" {
+        let ev = check_external(file_zone, imp["path"], cfg)
+        if ev["allowed"] {
+            return {}
+        }
+        return make_external_violation(ev["severity"], file_zone, file, imp["path"], ev["rule"])
+    }
+
+    mut to_zone = "unknown"
+    if status == "internal" {
+        to_zone = match_zone(res["resolved"], zones, zone_names)
+    }
+
+    let verdict = check_dependency(file_zone, to_zone, cfg)
+    if verdict["allowed"] {
+        return {}
+    }
+
+    return make_violation(verdict["severity"], file_zone, to_zone, file, imp["path"], res["resolved"], verdict["rule"])
+}
+
+// Increment a per-zone file counter.
+func bump(counts, zone) {
+    if dict_has(counts, zone) {
+        counts[zone] = counts[zone] + 1
+        return counts
+    }
+    counts[zone] = 1
+    return counts
+}

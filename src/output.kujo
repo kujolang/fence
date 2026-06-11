@@ -1,0 +1,73 @@
+// src/output.kujo
+// Centralized, path-safe file writing for Fence.
+
+from src.paths import is_safe_output, normalize_sep, parent_dir
+
+// Write `content` to `path` after enforcing path safety.
+// Returns { ok: bool, error: string }. Never overwrites silently unless
+// `allow_overwrite` is true (Kujo's write_file errors if the file exists, so we
+// remove it first only when overwrite is permitted).
+export func write_safe(path, content, allow_overwrite) {
+    if is_safe_output(path) == false {
+        return { "ok": false, "error": "unsafe output path: " + path }
+    }
+    let p = normalize_sep(path)
+
+    // Canonical safety: resolve the nearest existing ancestor directory and
+    // confirm it still lives under the current working directory. This catches
+    // a symlinked parent directory that would let a textually-safe relative
+    // path escape the repo. path_absolute() resolves symlinks but errors on
+    // non-existent paths, so we anchor on the nearest existing ancestor.
+    if within_cwd(p) == false {
+        return { "ok": false, "error": "output path escapes the working directory (symlinked parent?): " + p }
+    }
+
+    if file_exists(p) {
+        if allow_overwrite == false {
+            return { "ok": false, "error": "refusing to overwrite existing file: " + p }
+        }
+        delete_file(p)
+    }
+
+    let dir = parent_dir(p)
+    if dir != "" {
+        if path_is_dir(dir) == false {
+            create_dir(dir)
+        }
+    }
+
+    write_file(p, content)
+    return { "ok": true, "error": "" }
+}
+
+// True when the resolved nearest-existing-ancestor of `p` is inside cwd.
+func within_cwd(p) {
+    let anchor = nearest_existing_ancestor(p)
+    mut abs = ""
+    try {
+        abs = path_absolute(anchor)
+    } except e {
+        return false
+    }
+    let cwd = os_getcwd()
+    if abs == cwd {
+        return true
+    }
+    return starts_with(abs, cwd + "/")
+}
+
+// Walk up from `p`'s parent to the nearest directory that exists. Returns "."
+// (the cwd) when no ancestor segment exists yet.
+func nearest_existing_ancestor(p) {
+    mut dir = parent_dir(p)
+    loop {
+        if dir == "" {
+            return "."
+        }
+        if path_exists(dir) {
+            return dir
+        }
+        dir = parent_dir(dir)
+    }
+    return "."
+}

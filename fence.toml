@@ -1,0 +1,60 @@
+# fence.toml - Fence dogfooding its own architecture.
+# Layering: cli -> commands -> core -> foundations.
+# Run: kujo run fence.kujo -- check
+
+version = 1
+source_roots = ["src"]
+default_severity = "error"
+fail_on = "error"
+unknown_dependency_policy = "warn"
+
+[scan]
+include = ["src/**/*.kujo"]
+exclude = []
+
+[zones.cli]
+paths = ["src/cli.kujo"]
+can_depend_on = ["commands", "core", "foundations"]
+cannot_depend_on = []
+severity = "error"
+
+[zones.commands]
+paths = ["src/cmd_*.kujo"]
+can_depend_on = ["core", "foundations"]
+cannot_depend_on = ["cli"]
+severity = "error"
+
+[zones.core]
+paths = [
+  "src/analyze.kujo",
+  "src/config.kujo",
+  "src/validate.kujo",
+  "src/walk.kujo",
+  "src/glob.kujo",
+  "src/imports.kujo",
+  "src/resolve.kujo",
+  "src/zones.kujo",
+  "src/rules.kujo",
+  "src/cycles.kujo",
+  "src/graph.kujo",
+  "src/reports.kujo",
+  "src/baseline.kujo",
+  "src/output.kujo",
+  "src/git.kujo",
+  "src/cliargs.kujo"
+]
+can_depend_on = ["foundations"]
+cannot_depend_on = ["cli", "commands"]
+severity = "error"
+
+[zones.foundations]
+paths = [
+  "src/util.kujo",
+  "src/paths.kujo",
+  "src/meta.kujo",
+  "src/templates.kujo",
+  "src/imports_ext.kujo"
+]
+can_depend_on = []
+cannot_depend_on = ["cli", "commands", "core"]
+severity = "error"

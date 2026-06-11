@@ -1,0 +1,140 @@
+// src/imports_ext.kujo
+// Best-effort import extractors for Rust, PHP, and Go.
+// Same record shape as imports.kujo: { kind, path, raw }.
+//
+// These languages are SCANNED targets only. Fence itself is written in Kujo.
+
+func rec(kind, path, raw) {
+    return { "kind": kind, "path": path, "raw": raw }
+}
+
+func to_lines(content) {
+    return split(content, "\n")
+}
+
+func clean_line(line) {
+    return trim(replace(line, "\r", ""))
+}
+
+func first_quoted(s) {
+    mut i = 0
+    mut q = ""
+    mut start = -1
+    loop {
+        let ch = substring(s, i, i + 1)
+        if ch == "" {
+            return ""
+        }
+        if start < 0 {
+            if ch == "'" || ch == "\"" {
+                q = ch
+                start = i + 1
+            }
+        } else {
+            if ch == q {
+                return substring(s, start, i)
+            }
+        }
+        i = i + 1
+    }
+    return ""
+}
+
+func strip_trailing(tok) {
+    return regex_replace(trim(tok), "[;,]+$", "")
+}
+
+// ---- Rust ----
+// use crate::domain::User;  -> path "crate::domain::User"
+// use super::thing;
+// mod parser;  /  pub mod parser;
+export func extract_rust(content) {
+    let lines = to_lines(content)
+    let n = len(lines)
+    mut out = []
+    mut i = 0
+    while i < n {
+        let line = clean_line(lines[i])
+        if regex_match(line, "^use\\s+[A-Za-z0-9_:]+") {
+            let parts = regex_split(line, "\\s+")
+            // parts[1] is the path; strip trailing ; and any "as alias".
+            let p = strip_trailing(parts[1])
+            out = push(out, rec("use", p, line))
+        } else {
+            if regex_match(line, "^(pub\\s+)?mod\\s+[A-Za-z0-9_]+\\s*;") {
+                let m = regex_replace(line, "^(pub\\s+)?mod\\s+", "")
+                out = push(out, rec("mod", strip_trailing(m), line))
+            }
+        }
+        i = i + 1
+    }
+    return out
+}
+
+// ---- PHP ----
+// use App\Domain\User;
+// require_once __DIR__ . '/x.php';
+// include 'x.php';
+export func extract_php(content) {
+    let lines = to_lines(content)
+    let n = len(lines)
+    mut out = []
+    mut i = 0
+    while i < n {
+        let line = clean_line(lines[i])
+        if regex_match(line, "^use\\s+[A-Za-z0-9_\\\\]+") {
+            let parts = regex_split(line, "\\s+")
+            out = push(out, rec("use", strip_trailing(parts[1]), line))
+        } else {
+            if regex_match(line, "\\b(require_once|require|include_once|include)\\b") {
+                let path = first_quoted(line)
+                if path != "" {
+                    out = push(out, rec("require", path, line))
+                }
+            }
+        }
+        i = i + 1
+    }
+    return out
+}
+
+// ---- Go ----
+// import "fmt"
+// import "myapp/domain"
+// import (
+//   "fmt"
+//   "myapp/shared"
+// )
+export func extract_go(content) {
+    let lines = to_lines(content)
+    let n = len(lines)
+    mut out = []
+    mut in_block = false
+    mut i = 0
+    while i < n {
+        let line = clean_line(lines[i])
+        if in_block {
+            if regex_match(line, "^\\)") {
+                in_block = false
+            } else {
+                let path = first_quoted(line)
+                if path != "" {
+                    out = push(out, rec("import", path, line))
+                }
+            }
+        } else {
+            if regex_match(line, "^import\\s*\\(") {
+                in_block = true
+            } else {
+                if regex_match(line, "^import\\s+['\"]") {
+                    let path = first_quoted(line)
+                    if path != "" {
+                        out = push(out, rec("import", path, line))
+                    }
+                }
+            }
+        }
+        i = i + 1
+    }
+    return out
+}

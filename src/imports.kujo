@@ -1,0 +1,239 @@
+// src/imports.kujo
+// Best-effort, deterministic import extraction for the languages Fence scans.
+//
+// This is NOT a parser: it scans line by line with simple string/regex rules.
+// Each extractor returns an array of records:
+//   { kind: "import"|"from"|"require"|"dynamic"|"use"|"mod", path, raw }
+// `path` is the module/path string exactly as written in the source.
+//
+// Extractors covered here: Kujo, JavaScript/TypeScript, Python.
+// Rust/PHP/Go live in imports_ext.kujo (loaded via detect_imports).
+
+from src.paths import file_ext
+from src.imports_ext import extract_rust, extract_php, extract_go
+
+func rec(kind, path, raw) {
+    return { "kind": kind, "path": path, "raw": raw }
+}
+
+// Split content into lines (handles \n; \r is trimmed per-line).
+func to_lines(content) {
+    return split(content, "\n")
+}
+
+func clean_line(line) {
+    return trim(replace(line, "\r", ""))
+}
+
+// Extract the contents of the first single/double-quoted string on the line.
+// Returns "" when there is no quoted string.
+export func first_quoted(s) {
+    mut i = 0
+    mut q = ""
+    mut start = -1
+    loop {
+        let ch = substring(s, i, i + 1)
+        if ch == "" {
+            return ""
+        }
+        if start < 0 {
+            if ch == "'" || ch == "\"" {
+                q = ch
+                start = i + 1
+            }
+        } else {
+            if ch == q {
+                return substring(s, start, i)
+            }
+        }
+        i = i + 1
+    }
+    return ""
+}
+
+// Strip trailing separators (`;`, `,`) and surrounding whitespace.
+func strip_trailing(tok) {
+    return regex_replace(trim(tok), "[;,]+$", "")
+}
+
+// ---- Kujo ----
+// import module_name
+// from module_name import a, b
+export func extract_kujo(content) {
+    let lines = to_lines(content)
+    let n = len(lines)
+    mut out = []
+    mut i = 0
+    while i < n {
+        let line = clean_line(lines[i])
+        if regex_match(line, "^from\\s+[A-Za-z0-9_.]+\\s+import\\b") {
+            let parts = regex_split(line, "\\s+")
+            out = push(out, rec("from", strip_trailing(parts[1]), line))
+        } else {
+            if regex_match(line, "^import\\s+[A-Za-z0-9_.]+") {
+                let parts = regex_split(line, "\\s+")
+                out = push(out, rec("import", strip_trailing(parts[1]), line))
+            }
+        }
+        i = i + 1
+    }
+    return out
+}
+
+// ---- Python ----
+// import foo / import foo.bar
+// from foo import bar / from . import x / from ..domain import y
+export func extract_python(content) {
+    let lines = to_lines(content)
+    let n = len(lines)
+    mut out = []
+    mut i = 0
+    while i < n {
+        let line = clean_line(lines[i])
+        if regex_match(line, "^from\\s+[.A-Za-z0-9_]+\\s+import\\b") {
+            let parts = regex_split(line, "\\s+")
+            out = push(out, rec("from", strip_trailing(parts[1]), line))
+        } else {
+            if regex_match(line, "^import\\s+[A-Za-z0-9_.]+") {
+                let parts = regex_split(line, "\\s+")
+                out = push(out, rec("import", strip_trailing(parts[1]), line))
+            }
+        }
+        i = i + 1
+    }
+    return out
+}
+
+// ---- JavaScript / TypeScript ----
+// import x from "./x"
+// import { x } from "../x"
+// import "./side-effect"
+// export { x } from "./x"      (re-export)
+// const x = require("./x")
+// const x = await import("./x")
+//
+// Best-effort comment handling: whole-line `//` comments, single-line and
+// multi-line `/* ... */` block comments are skipped so commented-out imports
+// are not falsely reported. A trailing `// note` after a real import is fine
+// because first_quoted() picks the import's own quoted path.
+export func extract_javascript(content) {
+    let lines = to_lines(content)
+    let n = len(lines)
+    mut out = []
+    mut in_comment = false
+    mut i = 0
+    while i < n {
+        let line = clean_line(lines[i])
+        if in_comment {
+            if contains(line, "*/") == 1 {
+                in_comment = false
+            }
+        } else {
+            if is_js_comment_open(line) {
+                if contains(line, "*/") == 0 {
+                    in_comment = true
+                }
+            } else {
+                if is_line_comment(line) == false {
+                    out = js_scan_line(out, line)
+                }
+            }
+        }
+        i = i + 1
+    }
+    return out
+}
+
+// A line that begins a block comment (and is therefore not code we scan).
+func is_js_comment_open(line) {
+    return starts_with(line, "/*")
+}
+
+// A whole-line `//` comment or a continuation `*` line inside a block.
+func is_line_comment(line) {
+    if starts_with(line, "//") {
+        return true
+    }
+    if starts_with(line, "*") {
+        return true
+    }
+    return false
+}
+
+func js_scan_line(out, line) {
+    let path = first_quoted(line)
+    if path == "" {
+        return out
+    }
+    if regex_match(line, "\\bfrom\\s*['\"]") {
+        return push(out, rec("from", path, line))
+    }
+    if regex_match(line, "\\brequire\\s*\\(\\s*['\"]") {
+        return push(out, rec("require", path, line))
+    }
+    if regex_match(line, "\\bimport\\s*\\(\\s*['\"]") {
+        return push(out, rec("dynamic", path, line))
+    }
+    if regex_match(line, "^import\\s+['\"]") {
+        return push(out, rec("import", path, line))
+    }
+    return out
+}
+
+// Dispatch by extension. Returns [] for unknown/unsupported extensions.
+// An unreadable file (permissions, race) is skipped rather than aborting the
+// whole scan.
+export func detect_imports(file_path) {
+    mut content = ""
+    try {
+        content = read_file(file_path)
+    } except e {
+        return []
+    }
+    return extract_for_ext(file_ext(file_path), content)
+}
+
+// Separated so it can be unit-tested without touching the filesystem.
+export func extract_for_ext(ext, content) {
+    if ext == ".kujo" {
+        return extract_kujo(content)
+    }
+    if ext == ".py" {
+        return extract_python(content)
+    }
+    if is_js_ext(ext) {
+        return extract_javascript(content)
+    }
+    if ext == ".rs" {
+        return extract_rust(content)
+    }
+    if ext == ".php" {
+        return extract_php(content)
+    }
+    if ext == ".go" {
+        return extract_go(content)
+    }
+    return []
+}
+
+func is_js_ext(ext) {
+    if ext == ".js" {
+        return true
+    }
+    if ext == ".jsx" {
+        return true
+    }
+    if ext == ".ts" {
+        return true
+    }
+    if ext == ".tsx" {
+        return true
+    }
+    if ext == ".mjs" {
+        return true
+    }
+    if ext == ".cjs" {
+        return true
+    }
+    return false
+}

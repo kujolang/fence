@@ -1,0 +1,164 @@
+// src/cmd_explain.kujo
+// Implements `fence explain <path>`.
+//
+// Explains how Fence classifies a single file: its zone, allowed/denied
+// dependencies, and a per-import allowed/denied/unknown breakdown.
+
+from src.config import load_config
+from src.zones import match_zone, match_zones_all
+from src.imports import detect_imports
+from src.resolve import resolve_import
+from src.rules import check_dependency
+from src.cliargs import flag_or
+from src.util import join_strings
+
+export func cmd_explain(parsed) {
+    let positionals = parsed["positionals"]
+    if len(positionals) == 0 {
+        print("Usage: kujo run fence.kujo -- explain <path> [--format json]")
+        return 2
+    }
+    let target = positionals[0]
+
+    let loaded = load_config()
+    if loaded["found"] == false {
+        print("No fence.toml found. Run: kujo run fence.kujo -- init")
+        return 2
+    }
+    if loaded["ok"] == false {
+        print("Config error: " + loaded["error"])
+        return 3
+    }
+    let cfg = loaded["config"]
+
+    if file_exists(target) == false {
+        print("File not found: " + target)
+        return 5
+    }
+
+    let analysis = analyze_file(target, cfg)
+    let format = flag_or(parsed["flags"], "format", "human")
+    if format == "json" {
+        print(to_json_pretty(analysis))
+        return 0
+    }
+    print(explain_human(analysis))
+    return 0
+}
+
+// Produce a structured explanation for one file.
+func analyze_file(target, cfg) {
+    let zones = cfg["zones"]
+    let zone_names = cfg["zone_names"]
+    let zone = match_zone(target, zones, zone_names)
+    let all_matches = match_zones_all(target, zones, zone_names)
+
+    mut allowed_deps = []
+    mut denied_deps = []
+    if zone != "unknown" {
+        allowed_deps = zones[zone]["can_depend_on"]
+        denied_deps = zones[zone]["cannot_depend_on"]
+    }
+
+    let imps = detect_imports(target)
+    let import_rows = explain_imports(target, zone, imps, cfg, zones, zone_names)
+
+    return {
+        "file": target,
+        "zone": zone,
+        "matched_zones": all_matches,
+        "in_scope": zone != "unknown",
+        "allowed": allowed_deps,
+        "denied": denied_deps,
+        "imports": import_rows
+    }
+}
+
+func explain_imports(target, zone, imps, cfg, zones, zone_names) {
+    let n = len(imps)
+    mut out = []
+    mut i = 0
+    while i < n {
+        let imp = imps[i]
+        let res = resolve_import(imp["path"], target, cfg["source_roots"], cfg["aliases"])
+        let row = explain_one(zone, imp, res, cfg, zones, zone_names)
+        out = push(out, row)
+        i = i + 1
+    }
+    return out
+}
+
+func explain_one(zone, imp, res, cfg, zones, zone_names) {
+    let status = res["status"]
+    mut to_zone = "unknown"
+    if status == "internal" {
+        to_zone = match_zone(res["resolved"], zones, zone_names)
+    }
+
+    mut decision = "allowed"
+    if status == "external" {
+        decision = "external"
+    } else {
+        if zone == "unknown" {
+            decision = "ungoverned"
+        } else {
+            let verdict = check_dependency(zone, to_zone, cfg)
+            if verdict["allowed"] {
+                decision = "allowed"
+            } else {
+                decision = "denied"
+            }
+        }
+    }
+
+    return {
+        "import": imp["path"],
+        "kind": imp["kind"],
+        "status": status,
+        "resolved": res["resolved"],
+        "to_zone": to_zone,
+        "decision": decision
+    }
+}
+
+func explain_human(a) {
+    mut o = ""
+    o = o + "Explain: " + a["file"] + "\n"
+    o = o + "=========" + "\n\n"
+    o = o + "Zone: " + a["zone"] + "\n"
+    if len(a["matched_zones"]) > 1 {
+        o = o + "Note: file matched multiple zones: " + join_strings(a["matched_zones"], ", ") + " (first wins)\n"
+    }
+    o = o + "In scope: " + to_string(a["in_scope"]) + "\n"
+    o = o + "Allowed dependencies: " + list_or_none(a["allowed"]) + "\n"
+    o = o + "Denied dependencies: " + list_or_none(a["denied"]) + "\n\n"
+
+    let imps = a["imports"]
+    let n = len(imps)
+    o = o + "Imports (" + to_string(n) + ")\n"
+    o = o + "-------\n"
+    if n == 0 {
+        o = o + "(none detected)\n"
+        return o
+    }
+    mut i = 0
+    while i < n {
+        let r = imps[i]
+        o = o + "[" + to_upper(r["decision"]) + "] " + r["import"]
+        if r["resolved"] != "" {
+            o = o + " -> " + r["resolved"] + " (" + r["to_zone"] + ")"
+        } else {
+            o = o + " (" + r["status"] + ")"
+        }
+        o = o + "\n"
+        i = i + 1
+    }
+    return o
+}
+
+func list_or_none(arr) {
+    if len(arr) == 0 {
+        return "(none)"
+    }
+    return join_strings(arr, ", ")
+}

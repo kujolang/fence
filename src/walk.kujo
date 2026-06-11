@@ -1,0 +1,92 @@
+// src/walk.kujo
+// Recursive-by-iteration file traversal for Fence.
+//
+// Tree walks are done with an explicit stack (no recursion and no helper calls
+// inside the loop) because Kujo's VM can corrupt loop state when a recursive
+// function is called from within a loop body. Only builtins run in the hot loop.
+
+from src.glob import glob_match_any
+from src.util import sort_strings
+
+// Collect repo-relative file paths under `source_roots` that match an include
+// pattern and no exclude pattern. `.git` is always skipped.
+//
+// Returns a sorted array of paths (deterministic order).
+export func walk(source_roots, include_patterns, exclude_patterns) {
+    mut found = []
+
+    // Seed the stack with existing source roots.
+    mut stack = []
+    let rn = len(source_roots)
+    mut ri = 0
+    while ri < rn {
+        let root = source_roots[ri]
+        if path_is_dir(root) {
+            stack = push(stack, root)
+        }
+        ri = ri + 1
+    }
+
+    // Iterative depth-first walk. Only builtins are used inside this loop.
+    while len(stack) > 0 {
+        let popped = pop(stack)
+        stack = popped[0]
+        let dir = popped[1]
+
+        // An unreadable directory (permissions) is skipped, not fatal.
+        mut entries = []
+        try {
+            entries = list_dir(dir)
+        } except e {
+            entries = []
+        }
+        let en = len(entries)
+        mut ei = 0
+        while ei < en {
+            let name = entries[ei]
+            mut full = dir + "/" + name
+            full = replace(full, "\\", "/")
+            if name == ".git" {
+                // skip
+            } else {
+                if path_is_dir(full) {
+                    stack = push(stack, full)
+                } else {
+                    found = push(found, full)
+                }
+            }
+            ei = ei + 1
+        }
+    }
+
+    return filter_files(found, include_patterns, exclude_patterns)
+}
+
+// Apply include/exclude filtering to a flat file list.
+func filter_files(files, include_patterns, exclude_patterns) {
+    mut out = []
+    let n = len(files)
+    mut i = 0
+    while i < n {
+        let f = files[i]
+        let included = is_included(f, include_patterns)
+        if included {
+            if glob_match_any(exclude_patterns, f) {
+                // excluded
+            } else {
+                out = push(out, f)
+            }
+        }
+        i = i + 1
+    }
+    return sort_strings(out)
+}
+
+// If no include patterns are configured, include everything; otherwise require
+// a match.
+func is_included(f, include_patterns) {
+    if len(include_patterns) == 0 {
+        return true
+    }
+    return glob_match_any(include_patterns, f)
+}

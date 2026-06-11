@@ -1,0 +1,51 @@
+# Example CI workflow for Fence.
+#
+# This YAML is configuration (not an implementation language), which is allowed
+# alongside the Kujo-only tool. Adjust the "Install Kujo" step to your
+# environment: build the Kujo interpreter, download a release binary, or run a
+# container that already provides `kujo` on PATH.
+name: fence
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  architecture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # required for --changed-only --base
+
+      - name: Install Kujo
+        run: |
+          # Provide the `kujo` binary on PATH. Replace with your install method,
+          # e.g. download a prebuilt release or build from source.
+          echo "Ensure 'kujo' is available on PATH before the next step."
+          kujo --version
+
+      - name: Lint Fence sources
+        run: |
+          for f in fence.kujo src/*.kujo tests/fence_tests.kujo; do
+            kujo check "$f"
+          done
+
+      - name: Unit tests
+        run: kujo run tests/fence_tests.kujo
+
+      - name: CLI smoke tests
+        run: sh tests/cli_smoke.sh
+
+      - name: Architecture check (changed files)
+        run: |
+          kujo run fence.kujo -- check \
+            --changed-only --base "origin/${{ github.base_ref || 'main' }}" \
+            --format sarif --output fence.sarif --fail-on error
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: fence.sarif

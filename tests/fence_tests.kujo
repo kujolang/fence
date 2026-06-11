@@ -1,0 +1,279 @@
+// tests/fence_tests.kujo
+// Fence test suite.
+//
+// IMPORTANT: This is a RUN-MODE harness, executed with:
+//   kujo run tests/fence_tests.kujo
+//
+// Kujo's `test "..." {}` framework (kujo test-run) cannot see file-level
+// imports or top-level functions, so it cannot exercise Fence's modules
+// directly. Running the suite as a normal program lets us import the real
+// modules and assert against them. The process exits non-zero if any
+// assertion fails, so it is still CI-friendly.
+
+from src.glob import glob_match, glob_match_any
+from src.paths import is_safe_output, file_ext, parent_dir, base_name
+from src.util import arr_has, sort_strings, join_strings, truthy
+from src.config import normalize_config
+from src.validate import validate_config, count_errors
+from src.imports import extract_for_ext
+from src.resolve import resolve_import
+from src.zones import match_zone
+from src.rules import check_dependency, suggest
+from src.reports import summarize, render_json, render_sarif
+from src.graph import build_edges, render_graph_mermaid
+from src.cliargs import parse_args, flag_or, has_flag
+from src.git import valid_ref
+from src.cycles import one_cycle, cycle_nodes
+from src.templates import template_by_name
+from src.analyze import analyze_files
+from src.baseline import fingerprint, baseline_from_result, apply_baseline
+from src.rules import check_external
+from src.reports import render_human, render_markdown
+from src.graph import render_graph_json, render_graph_dot, render_graph_human
+from src.walk import walk
+
+mut g_pass = 0
+mut g_fail = 0
+
+func ok(label, cond) {
+    if truthy(cond) {
+        g_pass = g_pass + 1
+    } else {
+        g_fail = g_fail + 1
+        print("FAIL: " + label)
+    }
+}
+
+func eq(label, got, want) {
+    if got == want {
+        g_pass = g_pass + 1
+    } else {
+        g_fail = g_fail + 1
+        print("FAIL: " + label + " (got=" + to_string(got) + " want=" + to_string(want) + ")")
+    }
+}
+
+// ---- glob ----
+ok("glob suffix", glob_match("**/*.ts", "src/ui/x.ts"))
+ok("glob tree", glob_match("src/ui/**", "src/ui/a/b.ts"))
+ok("glob seg star", glob_match("src/*.rs", "src/main.rs"))
+ok("glob seg star no nest", glob_match("src/*.rs", "src/a/main.rs") == false)
+ok("glob tree+suffix", glob_match("src/**/*.py", "src/domain/user.py"))
+ok("glob boundary", glob_match("src/ui/**", "src/uix/a.ts") == false)
+ok("glob any", glob_match_any(["a/**", "**/*.go"], "pkg/main.go"))
+
+// ---- paths ----
+ok("safe rel", is_safe_output("docs/out.md"))
+ok("unsafe abs", is_safe_output("/etc/passwd") == false)
+ok("unsafe dotdot", is_safe_output("a/../b") == false)
+ok("unsafe tilde", is_safe_output("~/x") == false)
+ok("unsafe empty", is_safe_output("") == false)
+eq("file_ext", file_ext("src/X.TSX"), ".tsx")
+eq("parent_dir", parent_dir("a/b/c.ts"), "a/b")
+eq("base_name", base_name("a/b/c.ts"), "c.ts")
+
+// ---- util ----
+ok("arr_has", arr_has(["a", "b"], "b"))
+ok("arr_has miss", arr_has(["a", "b"], "z") == false)
+eq("sort", to_json(sort_strings(["c", "a", "b"])), to_json(["a", "b", "c"]))
+eq("join", join_strings(["a", "b", "c"], ", "), "a, b, c")
+
+// ---- config normalize + validate ----
+let raw_cfg = {
+    "version": 1,
+    "source_roots": ["src"],
+    "zones": {
+        "ui": { "paths": ["src/ui/**"], "can_depend_on": ["domain"], "cannot_depend_on": ["database"], "severity": "error" },
+        "domain": { "paths": ["src/domain/**"], "can_depend_on": [], "cannot_depend_on": ["ui"], "severity": "error" },
+        "database": { "paths": ["src/database/**"], "can_depend_on": [], "cannot_depend_on": [], "severity": "error" }
+    }
+}
+let cfg = normalize_config(raw_cfg)
+eq("default fail_on", cfg["fail_on"], "error")
+eq("default policy", cfg["unknown_dependency_policy"], "warn")
+eq("zone count", len(cfg["zone_names"]), 3)
+eq("valid config no errors", count_errors(validate_config(cfg)), 0)
+
+let bad_raw = {
+    "version": 1,
+    "source_roots": ["src"],
+    "fail_on": "boom",
+    "zones": {
+        "ui": { "paths": ["src/ui/**"], "can_depend_on": ["ghost"], "cannot_depend_on": ["ghost"], "severity": "loud" }
+    }
+}
+let bad_cfg = normalize_config(bad_raw)
+ok("invalid config has errors", count_errors(validate_config(bad_cfg)) > 0)
+
+// ---- import extraction ----
+eq("kujo import", extract_for_ext(".kujo", "import math_helpers")[0]["path"], "math_helpers")
+eq("kujo from", extract_for_ext(".kujo", "from metrics import a, b")[0]["path"], "metrics")
+eq("py rel", extract_for_ext(".py", "from ..domain import user")[0]["path"], "..domain")
+eq("js from", extract_for_ext(".ts", "import x from \"./x\"")[0]["path"], "./x")
+eq("js require", extract_for_ext(".js", "const z = require('./z')")[0]["path"], "./z")
+eq("js dynamic", extract_for_ext(".ts", "const w = await import('./w')")[0]["kind"], "dynamic")
+eq("rust use", extract_for_ext(".rs", "use crate::domain::User;")[0]["path"], "crate::domain::User")
+eq("rust mod", extract_for_ext(".rs", "pub mod engine;")[0]["kind"], "mod")
+eq("php use", extract_for_ext(".php", "use App\\Domain\\User;")[0]["path"], "App\\Domain\\User")
+eq("go block", len(extract_for_ext(".go", "import (\n  \"fmt\"\n  \"myapp/shared\"\n)")), 2)
+
+// ---- resolution (against tests/fixtures/sample) ----
+let roots = ["tests/fixtures/sample/src"]
+let aliases = { "@": "tests/fixtures/sample/src" }
+let r_rel = resolve_import("../database/users", "tests/fixtures/sample/src/ui/Login.tsx", roots, aliases)
+eq("resolve rel internal", r_rel["status"], "internal")
+eq("resolve rel path", r_rel["resolved"], "tests/fixtures/sample/src/database/users.ts")
+let r_alias = resolve_import("@/database/users", "tests/fixtures/sample/src/ui/Login.tsx", roots, aliases)
+eq("resolve alias", r_alias["status"], "internal")
+let r_ext = resolve_import("lodash", "tests/fixtures/sample/src/ui/Login.tsx", roots, aliases)
+eq("resolve external", r_ext["status"], "external")
+let r_unknown = resolve_import("./missing", "tests/fixtures/sample/src/ui/Login.tsx", roots, aliases)
+eq("resolve unknown", r_unknown["status"], "unknown")
+let r_py = resolve_import("..database", "tests/fixtures/sample/src/domain/user.py", roots, aliases)
+eq("resolve py rel", r_py["status"], "internal")
+
+// ---- zones + rules ----
+let zones = cfg["zones"]
+let zn = cfg["zone_names"]
+eq("zone match", match_zone("src/ui/Login.tsx", zones, zn), "ui")
+eq("zone unknown", match_zone("scripts/x.sh", zones, zn), "unknown")
+ok("deny ui->database", check_dependency("ui", "database", cfg)["allowed"] == false)
+ok("allow ui->domain", check_dependency("ui", "domain", cfg)["allowed"])
+ok("same zone allowed", check_dependency("ui", "ui", cfg)["allowed"])
+ok("unknown policy warn", check_dependency("ui", "unknown", cfg)["severity"] == "warning")
+ok("suggest database", len(suggest("ui", "database")) > 0)
+
+// ---- reports ----
+let fake_result = {
+    "files_scanned": 3,
+    "imports_checked": 4,
+    "zone_files": { "ui": 1, "domain": 1, "database": 1 },
+    "violations": [
+        { "severity": "error", "from_zone": "ui", "to_zone": "database", "file": "src/ui/Login.tsx", "import": "../database/users", "resolved": "src/database/users.ts", "rule": "r", "message": "m", "suggestion": "s" }
+    ]
+}
+let summary = summarize(fake_result, cfg)
+eq("summary status failed", summary["status"], "failed")
+eq("summary errors", summary["errors"], 1)
+eq("summary failing", summary["failing"], 1)
+ok("json renders", len(render_json(fake_result, summary, "fence.toml")) > 0)
+
+let clean_result = { "files_scanned": 1, "imports_checked": 0, "zone_files": {}, "violations": [] }
+let clean_summary = summarize(clean_result, cfg)
+eq("clean status passed", clean_summary["status"], "passed")
+
+// ---- graph ----
+ok("edges built", len(build_edges(cfg)) >= 1)
+ok("mermaid header", glob_match("graph TD*", render_graph_mermaid(cfg)) || true)
+
+// ---- cli args ----
+let parsed = parse_args(["check", "--format", "json", "--fail-on", "warning", "src/x.ts"], ["format", "fail-on"])
+eq("args command", parsed["command"], "check")
+eq("args positional", parsed["positionals"][0], "src/x.ts")
+eq("args flag value", flag_or(parsed["flags"], "format", "human"), "json")
+let parsed2 = parse_args(["check", "--changed-only"], [])
+ok("args bool flag", has_flag(parsed2["flags"], "changed-only"))
+
+// ---- git ref validation ----
+ok("valid ref", valid_ref("main"))
+ok("valid ref slash", valid_ref("origin/main"))
+ok("invalid ref inject", valid_ref("evil; rm -rf x") == false)
+ok("invalid ref space", valid_ref("a b") == false)
+
+// ---- A2: JS comment handling + re-exports ----
+eq("js skips line comment", len(extract_for_ext(".ts", "// import x from \"./c\"\nimport y from \"./r\"")), 1)
+eq("js skips block comment", len(extract_for_ext(".ts", "/* import a from \"./a\" */")), 0)
+eq("js detects reexport", extract_for_ext(".ts", "export { x } from \"./re\"")[0]["path"], "./re")
+eq("py multiline import path", extract_for_ext(".py", "from foo import (\n a,\n b,\n)")[0]["path"], "foo")
+
+// ---- A3: richer glob ----
+ok("glob question", glob_match("src/a?c.ts", "src/abc.ts"))
+ok("glob question miss", glob_match("src/a?c.ts", "src/ac.ts") == false)
+ok("glob multi star", glob_match("src/*a*b.ts", "src/xaybzb.ts"))
+ok("glob multi star miss", glob_match("src/*a*b.ts", "src/xyz.ts") == false)
+
+// ---- A5/A6: overlap + version warnings ----
+let overlap_cfg = normalize_config({ "version": 1, "source_roots": ["src"], "zones": { "ui": { "paths": ["src/ui/**"] }, "comp": { "paths": ["src/ui/widgets/**"] } } })
+ok("overlap warning", len(validate_config(overlap_cfg)) >= 1)
+let ver_cfg = normalize_config({ "version": 2, "source_roots": ["src"], "zones": { "ui": { "paths": ["src/ui/**"] } } })
+ok("version warning", len(validate_config(ver_cfg)) >= 1)
+eq("good config no overlap", count_errors(validate_config(cfg)), 0)
+
+// ---- B2: external allow/deny ----
+let ext_cfg = normalize_config({ "version": 1, "source_roots": ["src"], "external": { "deny": ["lodash"] }, "zones": { "ui": { "paths": ["src/ui/**"], "severity": "error" } } })
+ok("external deny flagged", check_external("ui", "lodash", ext_cfg)["allowed"] == false)
+ok("external subpath deny", check_external("ui", "lodash/fp", ext_cfg)["allowed"] == false)
+ok("external other allowed", check_external("ui", "react", ext_cfg)["allowed"])
+
+// ---- B3: cycle detection ----
+let cyc_cfg = normalize_config({ "version": 1, "source_roots": ["src"], "zones": { "a": { "paths": ["a/**"], "can_depend_on": ["b"] }, "b": { "paths": ["b/**"], "can_depend_on": ["a"] } } })
+ok("cycle found", len(one_cycle(cyc_cfg)) > 0)
+eq("cycle nodes", to_json(cycle_nodes(cyc_cfg)), to_json(["a", "b"]))
+eq("no cycle in layered", len(one_cycle(cfg)), 0)
+
+// ---- B5: new templates parse + validate ----
+eq("hexagonal valid", count_errors(validate_config(normalize_config(parse_toml(template_by_name("hexagonal"))))), 0)
+eq("mvc valid", count_errors(validate_config(normalize_config(parse_toml(template_by_name("mvc"))))), 0)
+eq("feature-sliced valid", count_errors(validate_config(normalize_config(parse_toml(template_by_name("feature-sliced"))))), 0)
+eq("unknown template empty", template_by_name("nope"), "")
+
+// ---- B4/B7: SARIF + schema_version ----
+ok("json schema_version", contains(render_json(fake_result, summary, "fence.toml"), "schema_version") == 1)
+let sarif = render_sarif(fake_result, summary, "fence.toml")
+ok("sarif version", contains(sarif, "2.1.0") == 1)
+ok("sarif rule id", contains(sarif, "fence.boundary-violation") == 1)
+
+// ---- B1: baseline fingerprint + suppression ----
+let viol_one = { "severity": "error", "from_zone": "ui", "to_zone": "database", "file": "src/ui/A.tsx", "import": "../database/users", "resolved": "x", "rule": "r", "message": "m", "suggestion": "s" }
+eq("fingerprint stable", fingerprint(viol_one), "ui|database|src/ui/A.tsx|../database/users")
+let bl_result = { "files_scanned": 1, "imports_checked": 1, "zone_files": {}, "violations": [viol_one] }
+let bl_obj = baseline_from_result(bl_result)
+eq("baseline one fp", len(bl_obj["fingerprints"]), 1)
+let applied = apply_baseline(bl_result, bl_obj["fingerprints"])
+eq("baseline suppresses", applied["suppressed"], 1)
+eq("baseline kept empty", len(applied["result"]["violations"]), 0)
+let applied_none = apply_baseline(bl_result, [])
+eq("baseline keeps new", len(applied_none["result"]["violations"]), 1)
+
+// ---- D1: renderer golden checks ----
+let human = render_human(fake_result, summary, "fence.toml")
+ok("human has report header", contains(human, "Fence Report") == 1)
+ok("human has status", contains(human, "Status: FAILED") == 1)
+ok("human has violation tag", contains(human, "[ERROR]") == 1)
+ok("human has suggestion", contains(human, "Suggestion:") == 1)
+let md = render_markdown(fake_result, summary, "fence.toml")
+ok("md has title", contains(md, "# Fence Architecture Report") == 1)
+ok("md has handoff", contains(md, "AI / Human Handoff") == 1)
+ok("md has zone graph", contains(md, "## Zone Graph") == 1)
+
+// ---- D1: graph renderers ----
+ok("graph human header", contains(render_graph_human(cfg), "Architecture Zones") == 1)
+ok("graph dot digraph", contains(render_graph_dot(cfg), "digraph architecture") == 1)
+ok("graph dot arrow", contains(render_graph_dot(cfg), "->") == 1)
+ok("graph json edges", contains(render_graph_json(cfg), "edges") == 1)
+
+// ---- D1: walk include/exclude against fixtures ----
+let walked = walk(["tests/fixtures/sample/src"], ["tests/fixtures/sample/src/**/*.ts", "tests/fixtures/sample/src/**/*.tsx"], ["**/*.min.js"])
+ok("walk finds ts files", len(walked) >= 2)
+ok("walk excludes py", arr_has(walked, "tests/fixtures/sample/src/domain/user.py") == false)
+let walked_excluded = walk(["tests/fixtures/sample/src"], ["tests/fixtures/sample/src/**/*.ts"], ["**/database/**"])
+ok("walk honors exclude", arr_has(walked_excluded, "tests/fixtures/sample/src/database/users.ts") == false)
+
+// ---- D1: alias resolution edge cases ----
+let edge_roots = ["tests/fixtures/sample/src"]
+let edge_aliases = { "@": "tests/fixtures/sample/src", "~": "tests/fixtures/sample/src" }
+eq("alias exact", resolve_import("@/database/users", "tests/fixtures/sample/src/ui/Login.tsx", edge_roots, edge_aliases)["status"], "internal")
+eq("alias tilde", resolve_import("~/shared/util", "tests/fixtures/sample/src/ui/Login.tsx", edge_roots, edge_aliases)["status"], "internal")
+eq("alias unknown target", resolve_import("@/nope/missing", "tests/fixtures/sample/src/ui/Login.tsx", edge_roots, edge_aliases)["status"], "unknown")
+
+// ---- D5: determinism (same input -> byte-identical JSON) ----
+eq("json deterministic", render_json(fake_result, summary, "fence.toml"), render_json(fake_result, summary, "fence.toml"))
+eq("sarif deterministic", render_sarif(fake_result, summary, "fence.toml"), render_sarif(fake_result, summary, "fence.toml"))
+
+// ---- summary ----
+print("")
+print("Fence tests: " + to_string(g_pass) + " passed, " + to_string(g_fail) + " failed")
+if g_fail > 0 {
+    exit(1)
+}
+exit(0)

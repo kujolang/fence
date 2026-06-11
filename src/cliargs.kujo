@@ -1,0 +1,86 @@
+// src/cliargs.kujo
+// Minimal command-line parsing for Fence.
+//
+// Produces { command, positionals[], flags{} }. Flags accept the forms:
+//   --name value     -> flags["name"] = "value"
+//   --name=value     -> flags["name"] = "value"
+//   --flag           -> flags["flag"] = "true"   (when not followed by a value)
+// Known value-flags are passed in so booleans are not greedily consumed.
+
+from src.util import arr_has, dict_has
+
+// value_flags: array of flag names that always take a following value.
+export func parse_args(argv, value_flags) {
+    let n = len(argv)
+    mut command = ""
+    mut positionals = []
+    mut flags = {}
+
+    mut i = 0
+    while i < n {
+        let tok = argv[i]
+        if starts_with(tok, "--") {
+            let body = substring(tok, 2, len(tok))
+            let eq = find_eq(body)
+            if eq >= 0 {
+                let k = substring(body, 0, eq)
+                let v = substring(body, eq + 1, len(body))
+                flags[k] = v
+            } else {
+                // Does the next token serve as this flag's value?
+                if arr_has(value_flags, body) {
+                    if i + 1 < n {
+                        flags[body] = argv[i + 1]
+                        i = i + 1
+                    } else {
+                        flags[body] = ""
+                    }
+                } else {
+                    flags[body] = "true"
+                }
+            }
+        } else {
+            if command == "" {
+                command = tok
+            } else {
+                positionals = push(positionals, tok)
+            }
+        }
+        i = i + 1
+    }
+
+    return {
+        "command": command,
+        "positionals": positionals,
+        "flags": flags
+    }
+}
+
+// Character-based scan for `=` (returns char index or -1).
+func find_eq(s) {
+    mut i = 0
+    loop {
+        let ch = substring(s, i, i + 1)
+        if ch == "" {
+            return -1
+        }
+        if ch == "=" {
+            return i
+        }
+        i = i + 1
+    }
+    return -1
+}
+
+// Convenience: flag value or fallback.
+export func flag_or(flags, name, fallback) {
+    if dict_has(flags, name) {
+        return flags[name]
+    }
+    return fallback
+}
+
+// Convenience: is a boolean flag present (any value)?
+export func has_flag(flags, name) {
+    return dict_has(flags, name)
+}
