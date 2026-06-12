@@ -6,7 +6,7 @@ A local-first, deterministic architecture-boundary enforcer for Git repositories
 written entirely in the [Kujo](https://github.com/kujolang/kujo/) programming language.
 
 ![Made with Kujo](https://img.shields.io/badge/made%20with-Kujo-5b21b6)
-![Tests](https://img.shields.io/badge/tests-110%20passing-2ea44f)
+![Tests](https://img.shields.io/badge/tests-111%20passing-2ea44f)
 ![Implementation](https://img.shields.io/badge/implementation-100%25%20Kujo-blue)
 ![Network](https://img.shields.io/badge/network-none-lightgrey)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -67,6 +67,15 @@ kujo run fence.kujo -- check                # scan and report violations
 kujo run fence.kujo -- explain src/ui/LoginForm.tsx
 kujo run fence.kujo -- graph --format mermaid --output architecture.mmd
 ```
+
+Expected first-run signals:
+
+```text
+Created fence.toml (template: layered).
+Next: edit fence.toml, then run `kujo run fence.kujo -- check`.
+```
+
+When the generated config matches a clean repo, `check` reports `Status: PASSED`.
 
 Module resolution is relative to `fence.kujo`; file scanning happens in your
 current directory — so you can run the tool from anywhere inside a target repo:
@@ -174,8 +183,9 @@ and [docs/architecture.md](docs/architecture.md) for the full detail.
 ```
 fence.kujo              entry point (args -> dispatch -> exit code)
 src/*.kujo              implementation modules (see docs/architecture.md)
-tests/fence_tests.kujo  run-mode test harness (110 assertions)
+tests/fence_tests.kujo  run-mode test harness (111 assertions)
 docs/                   documentation
+agent/, MEGA_PROMPT.md  archived implementation prompts, not canonical examples
 ```
 
 ## Contributing

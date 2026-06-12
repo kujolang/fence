@@ -10,12 +10,31 @@ Kujo runtime imposes, and how to make a clean change.
   file is the one-line `fence.sh` wrapper.
 - **Deterministic & local-first.** No network, no timestamps, stable ordering.
 - **Small functions, shallow calls.** The Kujo VM stack is shallow.
+- **Copyable examples first.** Prioritize copyable examples over tests:
+  examples should model the most token-efficient idioms we want agents to
+  imitate.
+
+## Agent Search Hygiene
+
+Start with `README.md`, this file, and the focused page under `docs/` that
+matches the task. Treat `agent/**` and `MEGA_PROMPT.md` as archived
+implementation history, not canonical usage examples.
+
+Exclude generated/bulk paths from the main sweep unless the task explicitly
+targets them; document the search exclusions you used. For normal cleanup work,
+skip `tests/fixtures/**`, generated reports such as `FENCE_REPORT.md`,
+`fence-baseline.json`, `*.sarif`, and archived planning files under
+`agent/phases/**`.
+
+When editing docs or examples, keep command blocks short, runnable, and paired
+with representative output when that output clarifies success or failure.
 
 ## Project layout
 
 See [docs/architecture.md](docs/architecture.md) for the full module map. In
 short: `fence.kujo` is the entry point; `src/*.kujo` are the modules;
 `tests/fence_tests.kujo` is the test harness; `docs/` is documentation.
+The `agent/` directory and `MEGA_PROMPT.md` are historical planning artifacts.
 
 ## Development loop
 

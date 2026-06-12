@@ -36,11 +36,18 @@ kujo run /path/to/fence/fence.kujo -- validate  # sanity-check the config
 kujo run /path/to/fence/fence.kujo -- check     # scan and report
 ```
 
+Expected output from the first command:
+
+```text
+Created fence.toml (template: layered).
+Next: edit fence.toml, then run `kujo run fence.kujo -- check`.
+```
+
 `init` writes a starter `fence.toml` using the `layered` template. Pick a
 different starting point with `--template`:
 
 ```bash
-kujo run fence.kujo -- init --template hexagonal
+kujo run /path/to/fence/fence.kujo -- init --template hexagonal
 ```
 
 Templates: `layered` (default), `cli`, `web-app`, `hexagonal`, `mvc`,
@@ -88,6 +95,10 @@ After implementation:
 2. Fix violations before handoff.
 3. Include the Fence result (JSON or markdown) in the final report.
 ```
+
+Search tip for agents: canonical examples live in `README.md` and `docs/`.
+Skip `agent/**`, `MEGA_PROMPT.md`, generated reports, and `tests/fixtures/**`
+unless the task is explicitly about those paths.
 
 Next: [Configuration](configuration.md) · [Commands](commands.md) ·
 [CI integration](ci.md).

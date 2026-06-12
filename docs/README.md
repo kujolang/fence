@@ -12,3 +12,7 @@ Start at the [project README](../README.md) for the overview, then dive into:
 - **[FAQ](faq.md)** — common questions.
 - **[Troubleshooting](troubleshooting.md)** — fixes for common issues.
 - **[Enhancements backlog](ENHANCEMENTS.md)** — agent-executable roadmap.
+
+Canonical examples are in `README.md` and the command-focused docs above.
+`agent/**`, `MEGA_PROMPT.md`, and `tests/fixtures/**` are implementation
+history or validation data, not examples to copy into user projects.
