@@ -31,6 +31,7 @@ from src.rules import check_external
 from src.reports import render_human, render_markdown
 from src.graph import render_graph_json, render_graph_dot, render_graph_human
 from src.walk import walk
+from src.meta import no_config_text
 
 mut g_pass = 0
 mut g_fail = 0
@@ -77,6 +78,7 @@ ok("arr_has", arr_has(["a", "b"], "b"))
 ok("arr_has miss", arr_has(["a", "b"], "z") == false)
 eq("sort", to_json(sort_strings(["c", "a", "b"])), to_json(["a", "b", "c"]))
 eq("join", join_strings(["a", "b", "c"], ", "), "a, b, c")
+eq("no config text", no_config_text(), "No fence.toml found.\n\nRun:\n  kujo run fence.kujo -- init")
 
 // ---- config normalize + validate ----
 let raw_cfg = {

@@ -11,16 +11,14 @@ from src.cliargs import flag_or, has_flag
 from src.git import changed_files
 from src.glob import glob_match
 from src.baseline import load_baseline, apply_baseline
+from src.meta import no_config_text
 
 export func cmd_check(parsed) {
     let flags = parsed["flags"]
 
     let loaded = load_config()
     if loaded["found"] == false {
-        print("No fence.toml found.")
-        print("")
-        print("Run:")
-        print("  kujo run fence.kujo -- init")
+        print(no_config_text())
         return 2
     }
     if loaded["ok"] == false {

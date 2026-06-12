@@ -3,14 +3,12 @@
 
 from src.config import load_config
 from src.validate import validate_config, count_errors
+from src.meta import no_config_text
 
 export func cmd_validate(parsed) {
     let loaded = load_config()
     if loaded["found"] == false {
-        print("No fence.toml found.")
-        print("")
-        print("Run:")
-        print("  kujo run fence.kujo -- init")
+        print(no_config_text())
         return 2
     }
     if loaded["ok"] == false {
