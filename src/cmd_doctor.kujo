@@ -9,41 +9,45 @@ from src.util import join_strings
 
 export func cmd_doctor(parsed) {
     print(version_line())
-    print("Working directory: " + os_getcwd())
+    kv("Working directory", os_getcwd())
 
     let git = is_git_repo()
-    print("Git repository: " + yes_no(git))
+    kv("Git repository", yes_no(git))
     if git {
         let branch = current_branch()
         if branch != "" {
-            print("Current branch: " + branch)
+            kv("Current branch", branch)
         }
         let cc = changed_count()
         if cc >= 0 {
-            print("Changed files (vs HEAD): " + to_string(cc))
+            kv("Changed files (vs HEAD)", to_string(cc))
         }
     }
 
     let loaded = load_config()
     if loaded["found"] == false {
-        print("Config file: not found (run `kujo run fence.kujo -- init`)")
+        kv("Config file", "not found (run `kujo run fence.kujo -- init`)")
         return 0
     }
-    print("Config file: " + loaded["path"])
+    kv("Config file", loaded["path"])
     if loaded["ok"] == false {
-        print("Config parse: FAILED (" + loaded["error"] + ")")
+        kv("Config parse", "FAILED (" + loaded["error"] + ")")
         return 0
     }
 
     let cfg = loaded["config"]
-    print("Source roots: " + join_strings(cfg["source_roots"], ", "))
-    print("Configured zones: " + to_string(len(cfg["zone_names"])) + " (" + join_strings(cfg["zone_names"], ", ") + ")")
-    print("Language detectors: kujo, js/ts, python, rust, php, go")
+    kv("Source roots", join_strings(cfg["source_roots"], ", "))
+    kv("Configured zones", to_string(len(cfg["zone_names"])) + " (" + join_strings(cfg["zone_names"], ", ") + ")")
+    kv("Language detectors", "kujo, js/ts, python, rust, php, go")
 
     let diags = validate_config(cfg)
-    print("Config diagnostics: " + to_string(len(diags)))
+    kv("Config diagnostics", to_string(len(diags)))
     print_warnings(diags)
     return 0
+}
+
+func kv(label, value) {
+    print(label + ": " + value)
 }
 
 func print_warnings(diags) {

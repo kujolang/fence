@@ -13,8 +13,10 @@ export func cmd_init(parsed) {
 
     let content = template_by_name(template_name)
     if content == "" {
-        print("Unknown template: " + template_name)
-        print("Available templates: " + template_names())
+        print_lines([
+            "Unknown template: " + template_name,
+            "Available templates: " + template_names()
+        ])
         return 2
     }
 
@@ -31,7 +33,18 @@ export func cmd_init(parsed) {
         return 5
     }
 
-    print("Created fence.toml (template: " + template_name + ").")
-    print("Next: edit fence.toml, then run `kujo run fence.kujo -- check`.")
+    print_lines([
+        "Created fence.toml (template: " + template_name + ").",
+        "Next: edit fence.toml, then run `kujo run fence.kujo -- check`."
+    ])
     return 0
+}
+
+func print_lines(lines) {
+    let n = len(lines)
+    mut i = 0
+    while i < n {
+        print(lines[i])
+        i = i + 1
+    }
 }

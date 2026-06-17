@@ -1,6 +1,8 @@
 // src/meta.kujo
 // Version string and help/usage text for Fence.
 
+from src.util import join_strings
+
 // SINGLE SOURCE OF TRUTH for the Fence version. `version_line()`, the JSON
 // report, and the SARIF report all derive from this. Update here only (and
 // CHANGELOG.md) when releasing.
@@ -17,48 +19,48 @@ export func no_config_text() {
 }
 
 export func help_text() {
-    mut o = ""
-    o = o + "Fence - architecture boundary enforcement for Git repositories\n"
-    o = o + "Fence prevents agents and developers from crossing architecture boundaries.\n"
-    o = o + "\n"
-    o = o + "Usage:\n"
-    o = o + "  kujo run fence.kujo -- <command> [options]\n"
-    o = o + "\n"
-    o = o + "Commands:\n"
-    o = o + "  init                 Create a starter fence.toml\n"
-    o = o + "  check                Scan source files and report boundary violations\n"
-    o = o + "  explain <path>       Explain how Fence classifies a file\n"
-    o = o + "  graph                Print the architecture dependency graph\n"
-    o = o + "  baseline create      Record current violations to fence-baseline.json\n"
-    o = o + "  validate             Validate fence.toml\n"
-    o = o + "  doctor               Print environment diagnostics\n"
-    o = o + "  help                 Show this help\n"
-    o = o + "\n"
-    o = o + "Options:\n"
-    o = o + "  --version            Print version\n"
-    o = o + "  --help               Show this help\n"
-    o = o + "\n"
-    o = o + "init options:\n"
-    o = o + "  --template <name>    layered (default), cli, web-app, hexagonal, mvc, feature-sliced\n"
-    o = o + "  --force              Overwrite an existing fence.toml\n"
-    o = o + "\n"
-    o = o + "check options:\n"
-    o = o + "  --format <fmt>       human (default), json, markdown, sarif\n"
-    o = o + "  --output <path>      Write report to a repo-relative file\n"
-    o = o + "  --fail-on <level>    none, warning, error (overrides config)\n"
-    o = o + "  --changed-only       Only scan files changed vs Git base\n"
-    o = o + "  --base <ref>         Git base ref for --changed-only (default HEAD)\n"
-    o = o + "  --baseline           Suppress violations recorded in fence-baseline.json\n"
-    o = o + "  --quiet              Print only a one-line status to stdout\n"
-    o = o + "  --summary-only       Print only the summary line (no violation list)\n"
-    o = o + "  --no-color           Accepted for CI compatibility (output is already plain)\n"
-    o = o + "\n"
-    o = o + "graph options:\n"
-    o = o + "  --format <fmt>       human (default), json, dot, mermaid\n"
-    o = o + "  --output <path>      Write graph to a repo-relative file\n"
-    o = o + "\n"
-    o = o + "Exit codes:\n"
-    o = o + "  0 success   1 violations   2 invalid usage/config   3 parse error\n"
-    o = o + "  4 runtime   5 IO failure   6 internal failure\n"
-    return o
+    return join_strings([
+        "Fence - architecture boundary enforcement for Git repositories",
+        "Fence prevents agents and developers from crossing architecture boundaries.",
+        "",
+        "Usage:",
+        "  kujo run fence.kujo -- <command> [options]",
+        "",
+        "Commands:",
+        "  init                 Create a starter fence.toml",
+        "  check                Scan source files and report boundary violations",
+        "  explain <path>       Explain how Fence classifies a file",
+        "  graph                Print the architecture dependency graph",
+        "  baseline create      Record current violations to fence-baseline.json",
+        "  validate             Validate fence.toml",
+        "  doctor               Print environment diagnostics",
+        "  help                 Show this help",
+        "",
+        "Options:",
+        "  --version            Print version",
+        "  --help               Show this help",
+        "",
+        "init options:",
+        "  --template <name>    layered (default), cli, web-app, hexagonal, mvc, feature-sliced",
+        "  --force              Overwrite an existing fence.toml",
+        "",
+        "check options:",
+        "  --format <fmt>       human (default), json, markdown, sarif",
+        "  --output <path>      Write report to a repo-relative file",
+        "  --fail-on <level>    none, warning, error (overrides config)",
+        "  --changed-only       Only scan files changed vs Git base",
+        "  --base <ref>         Git base ref for --changed-only (default HEAD)",
+        "  --baseline           Suppress violations recorded in fence-baseline.json",
+        "  --quiet              Print only a one-line status to stdout",
+        "  --summary-only       Print only the summary line (no violation list)",
+        "  --no-color           Accepted for CI compatibility (output is already plain)",
+        "",
+        "graph options:",
+        "  --format <fmt>       human (default), json, dot, mermaid",
+        "  --output <path>      Write graph to a repo-relative file",
+        "",
+        "Exit codes:",
+        "  0 success   1 violations   2 invalid usage/config   3 parse error",
+        "  4 runtime   5 IO failure   6 internal failure"
+    ], "\n") + "\n"
 }

@@ -13,6 +13,9 @@ Kujo runtime imposes, and how to make a clean change.
 - **Copyable examples first.** Prioritize copyable examples over tests:
   examples should model the most token-efficient idioms we want agents to
   imitate.
+- **Readable CLI output.** For repeated command output, prefer tiny local
+  helpers such as `kv(label, value)` or `print_lines(lines)` once they make the
+  file easier to scan. Keep tiny first-run examples direct.
 
 ## Agent Search Hygiene
 
