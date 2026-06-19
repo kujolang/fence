@@ -97,8 +97,8 @@ After implementation:
 ```
 
 Search tip for agents: canonical examples live in `README.md` and `docs/`.
-Skip `agent/**`, `MEGA_PROMPT.md`, generated reports, and `tests/fixtures/**`
-unless the task is explicitly about those paths.
+Skip `agent/**`, generated reports, and `tests/fixtures/**` unless the task is
+explicitly about those paths.
 
 Next: [Configuration](configuration.md) · [Commands](commands.md) ·
 [CI integration](ci.md).

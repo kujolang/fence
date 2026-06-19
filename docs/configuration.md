@@ -60,8 +60,8 @@ severity = "error"
 | `exclude` | string[] | Glob patterns that remove files from scanning. `.git` is always skipped. |
 
 Glob support is pragmatic: `**/*.ext` (suffix), `prefix/**` (tree),
-`prefix/**/*.ext`, a single `*` or `?` and multiple `*` within one segment.
-No `{}`, `[]`.
+`prefix/**/*.ext`, `?` for one character, and one or more `*` within a path
+segment. No `{}`, `[]`.
 
 ## `[aliases]`
 

@@ -6,6 +6,22 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- Python grouped imports such as `import os, package.module as alias` now emit
+  one dependency record per imported module.
+- Tests cover grouped Python imports, leading-dash Git refs, and `.git/` output
+  paths.
+
+### Security
+- `--changed-only --base` now rejects refs beginning with `-` to prevent Git
+  option injection.
+- Report output paths now reject `.git` path segments in addition to existing
+  absolute-path, home, parent-traversal, and symlink-parent escape guards.
+
+### Documentation
+- Moved local implementation prompt history under the ignored `agent/` archive
+  and updated the public project layout/docs to keep the root production-focused.
+
 ## [1.0.0] - 2026-06-10
 
 ### Added

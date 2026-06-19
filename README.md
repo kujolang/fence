@@ -6,7 +6,7 @@ A local-first, deterministic architecture-boundary enforcer for Git repositories
 written entirely in the [Kujo](https://github.com/kujolang/kujo/) programming language.
 
 ![Made with Kujo](https://img.shields.io/badge/made%20with-Kujo-5b21b6)
-![Tests](https://img.shields.io/badge/tests-111%20passing-2ea44f)
+![Tests](https://img.shields.io/badge/tests-115%20passing-2ea44f)
 ![Implementation](https://img.shields.io/badge/implementation-100%25%20Kujo-blue)
 ![Network](https://img.shields.io/badge/network-none-lightgrey)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -114,7 +114,8 @@ Templates: `layered` (default), `cli`, `web-app`, `hexagonal`, `mvc`,
 | [Architecture](docs/architecture.md) | Module map and how the pipeline works |
 | [Performance](docs/performance.md) | Measured numbers and scaling guidance |
 | [FAQ](docs/faq.md) · [Troubleshooting](docs/troubleshooting.md) | Common questions and fixes |
-| [Enhancements backlog](docs/ENHANCEMENTS.md) | Agent-executable roadmap |
+| [Completed v1 checklist](docs/ENHANCEMENTS.md) | Prior hardening work already completed |
+| [Next enhancements](docs/NEXT_ENHANCEMENTS_2026-06-19.md) | Next-session roadmap |
 
 ## Example output
 
@@ -175,17 +176,18 @@ graph TD
 
 Best-effort line-based import detection (no AST); pragmatic glob matching
 (`**`, `*`, `?` — no `{}`/`[]`); conservative output-path safety (textual checks
-plus a symlink-escape guard). See [docs/troubleshooting.md](docs/troubleshooting.md)
-and [docs/architecture.md](docs/architecture.md) for the full detail.
+plus `.git`, parent-traversal, absolute-path, and symlink-escape guards). See
+[docs/troubleshooting.md](docs/troubleshooting.md) and
+[docs/architecture.md](docs/architecture.md) for the full detail.
 
 ## Project layout
 
 ```
 fence.kujo              entry point (args -> dispatch -> exit code)
 src/*.kujo              implementation modules (see docs/architecture.md)
-tests/fence_tests.kujo  run-mode test harness (111 assertions)
+tests/fence_tests.kujo  run-mode test harness (115 assertions)
 docs/                   documentation
-agent/, MEGA_PROMPT.md  archived implementation prompts, not canonical examples
+agent/                  ignored archive of implementation prompts and handoffs
 ```
 
 ## Contributing

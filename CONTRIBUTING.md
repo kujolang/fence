@@ -20,14 +20,13 @@ Kujo runtime imposes, and how to make a clean change.
 ## Agent Search Hygiene
 
 Start with `README.md`, this file, and the focused page under `docs/` that
-matches the task. Treat `agent/**` and `MEGA_PROMPT.md` as archived
-implementation history, not canonical usage examples.
+matches the task. Treat `agent/**` as archived implementation history, not
+canonical usage examples.
 
 Exclude generated/bulk paths from the main sweep unless the task explicitly
 targets them; document the search exclusions you used. For normal cleanup work,
 skip `tests/fixtures/**`, generated reports such as `FENCE_REPORT.md`,
-`fence-baseline.json`, `*.sarif`, and archived planning files under
-`agent/phases/**`.
+`fence-baseline.json`, `*.sarif`, and archived planning files under `agent/**`.
 
 When editing docs or examples, keep command blocks short, runnable, and paired
 with representative output when that output clarifies success or failure.
@@ -37,7 +36,7 @@ with representative output when that output clarifies success or failure.
 See [docs/architecture.md](docs/architecture.md) for the full module map. In
 short: `fence.kujo` is the entry point; `src/*.kujo` are the modules;
 `tests/fence_tests.kujo` is the test harness; `docs/` is documentation.
-The `agent/` directory and `MEGA_PROMPT.md` are historical planning artifacts.
+The ignored `agent/` directory contains historical planning artifacts.
 
 ## Development loop
 

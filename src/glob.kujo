@@ -5,10 +5,11 @@
 //   - exact paths:            src/main.kujo
 //   - suffix:                 **/*.ts          (matches any path ending in .ts)
 //   - prefix tree:            src/ui/**        (matches anything under src/ui/)
-//   - single `*` in a segment: src/*.rs        (one segment, no `/`)
+//   - `?` in a segment:        src/a?c.ts      (one char, no `/`)
+//   - `*` in a segment:        src/*a*b.ts     (one segment, no `/`)
 //   - combinations of the above resolved segment-by-segment.
 //
-// Limitations: no `{}`, `[]`, `?`, or `**` in the middle followed by more
+// Limitations: no `{}`, `[]`, or `**` in the middle followed by more
 // structure beyond a trailing suffix. These cover the fence.toml shapes.
 
 from src.paths import normalize_sep, base_name
