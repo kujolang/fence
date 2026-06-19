@@ -48,6 +48,8 @@ kujo run fence.kujo -- check --quiet
 | `--no-color` | Accepted for CI compatibility (output is already plain) |
 
 Exit `0` when clean at the threshold, `1` when violations reach it.
+The `--base` value must be a shell-safe Git ref and may not start with `-`, so it
+cannot be interpreted as a Git option.
 
 ## `explain <path>`
 

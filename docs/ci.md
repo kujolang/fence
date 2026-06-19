@@ -23,9 +23,10 @@ the diff:
 kujo run fence.kujo -- check --changed-only --base origin/main --fail-on error
 ```
 
-`--base` refs are strictly validated (`^[A-Za-z0-9._/~^-]+$`) before being passed
-to Git, so untrusted branch names cannot inject shell commands. If the workspace
-is not a Git repo, the command fails clearly.
+`--base` refs are strictly validated (`^[A-Za-z0-9._/~^-]+$`, non-empty,
+non-leading-dash) before being passed to Git, so untrusted branch names cannot
+inject shell commands or Git options. If the workspace is not a Git repo, the
+command fails clearly.
 
 ## Adopting on a legacy codebase
 

@@ -95,13 +95,39 @@ export func extract_python(content) {
             out = push(out, rec("from", strip_trailing(parts[1]), line))
         } else {
             if regex_match(line, "^import\\s+[A-Za-z0-9_.]+") {
-                let parts = regex_split(line, "\\s+")
-                out = push(out, rec("import", strip_trailing(parts[1]), line))
+                out = add_python_imports(out, line)
             }
         }
         i = i + 1
     }
     return out
+}
+
+// Python allows `import os, package.module as alias`; emit one dependency per
+// imported module so grouped imports cannot hide an architecture crossing.
+func add_python_imports(out, line) {
+    mut res = out
+    let body = substring(line, 7, len(line))
+    let toks = split(body, ",")
+    let n = len(toks)
+    mut i = 0
+    while i < n {
+        let path = python_import_name(toks[i])
+        if path != "" {
+            res = push(res, rec("import", path, line))
+        }
+        i = i + 1
+    }
+    return res
+}
+
+func python_import_name(tok) {
+    let t = strip_trailing(tok)
+    if t == "" {
+        return ""
+    }
+    let parts = regex_split(t, "\\s+")
+    return strip_trailing(parts[0])
 }
 
 // ---- JavaScript / TypeScript ----

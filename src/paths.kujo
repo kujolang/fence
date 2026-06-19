@@ -40,6 +40,9 @@ export func is_safe_output(path) {
         if segs[i] == ".." {
             return false
         }
+        if segs[i] == ".git" {
+            return false
+        }
         i = i + 1
     }
     return true
