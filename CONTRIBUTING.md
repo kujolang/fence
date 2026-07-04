@@ -1,88 +1,194 @@
-# Contributing to Fence
+# Contributing
 
-Thanks for helping improve Fence. This guide covers the layout, the rules the
-Kujo runtime imposes, and how to make a clean change.
+Thanks for helping improve this Kujo ecosystem project.
 
-## Principles
+This guide is intended for standalone Kujo tools and primitives. It does not
+cover the core Kujo language repo, Kujo Skills, or Kujo Workflows when those
+projects have their own contribution rules.
 
-- **Kujo only.** All tool code is `.kujo`. No Rust/JS/Python/Go/PHP in the
-  implementation (those are *scanned* languages). The only non-Kujo shipping
-  file is the one-line `fence.sh` wrapper.
-- **Deterministic & local-first.** No network, no timestamps, stable ordering.
-- **Small functions, shallow calls.** The Kujo VM stack is shallow.
-- **Copyable examples first.** Prioritize copyable examples over tests:
-  examples should model the most token-efficient idioms we want agents to
-  imitate.
-- **Readable CLI output.** For repeated command output, prefer tiny local
-  helpers such as `kv(label, value)` or `print_lines(lines)` once they make the
-  file easier to scan. Keep tiny first-run examples direct.
+## Development Principles
 
-## Agent Search Hygiene
+- Keep changes focused, reviewable, and tied to one user-visible concern.
+- Prefer deterministic, local-first behavior.
+- Do not add network calls, provider calls, timestamps, or machine-specific
+  output to core command paths unless the feature explicitly requires it.
+- Preserve redaction, path safety, guarded cleanup, and stable output ordering.
+- Add tests for behavior changes. Bug fixes should include regression coverage.
+- Avoid speculative refactors unless they directly simplify the change at hand.
 
-Start with `README.md`, this file, and the focused page under `docs/` that
-matches the task. Treat `agent/**` as archived implementation history, not
-canonical usage examples.
+For Fence specifically:
 
-Exclude generated/bulk paths from the main sweep unless the task explicitly
-targets them; document the search exclusions you used. For normal cleanup work,
-skip `tests/fixtures/**`, generated reports such as `FENCE_REPORT.md`,
-`fence-baseline.json`, `*.sarif`, and archived planning files under `agent/**`.
+- Keep tool code in `.kujo`; scanned languages are not implementation languages.
+- Preserve deterministic, local-first behavior with no network calls.
+- Preserve path-safe `--output` handling and safe `--changed-only --base`
+  validation.
+- Keep functions small and call chains shallow.
 
-When editing docs or examples, keep command blocks short, runnable, and paired
-with representative output when that output clarifies success or failure.
+## Local Setup
 
-## Project layout
-
-See [docs/architecture.md](docs/architecture.md) for the full module map. In
-short: `fence.kujo` is the entry point; `src/*.kujo` are the modules;
-`tests/fence_tests.kujo` is the test harness; `docs/` is documentation.
-The ignored `agent/` directory contains historical planning artifacts.
-
-## Development loop
+Use the Kujo runtime expected by this repository. Most repos support one of
+these environment variables:
 
 ```bash
-KUJO=/path/to/kujo           # e.g. kujo on PATH
+export KUJO_BIN=/path/to/kujo
+export KUJO=/path/to/kujo
+```
 
-# 1) lint every source file you touched
+Fence entry points:
+
+```text
+fence.kujo
+fence.sh
+```
+
+Project layout:
+
+```text
+fence.kujo              CLI entry point
+src/*.kujo              implementation modules
+tests/fence_tests.kujo  test harness
+docs/                   documentation
+agent/                  ignored historical planning artifacts
+```
+
+Check the repo README, `Makefile`, `tests/`, and `scripts/` directory for the
+authoritative local commands.
+
+## Agent And Example Hygiene
+
+Start with `README.md`, `CONTRIBUTING.md`, relevant docs, and examples before
+broad source sweeps.
+
+Treat user-facing examples as canonical copyable surfaces. Examples should be
+short, runnable, and representative of the idioms humans and agents should copy.
+
+For Fence, start with `README.md`, this file, and the focused page under
+`docs/` that matches the task. Treat `agent/**` as archived implementation
+history, not canonical usage examples.
+
+Exclude generated and bulk paths from broad searches unless the task explicitly
+targets them. For normal cleanup work, skip `tests/fixtures/**`, generated
+reports such as `FENCE_REPORT.md`, `fence-baseline.json`, `*.sarif`, and
+archived planning files under `agent/**`.
+
+```bash
+rg "pattern" README.md docs src tests fence.kujo \
+  -g '!agent/**' -g '!MEGA_PROMPT.md' -g '!tests/fixtures/**' \
+  -g '!FENCE_REPORT.md' -g '!fence-baseline.json' -g '!*.sarif'
+```
+
+Document any important search exclusions in larger cleanup or audit PRs.
+
+## Code Standards
+
+- Match the surrounding code style before introducing a new abstraction.
+- Keep command output readable and stable.
+- Prefer small local helpers for repeated output, error, section, or key/value
+  formatting once repetition distracts from the behavior.
+- Keep CLI contracts explicit: flags, exit codes, JSON fields, artifact paths,
+  and documented examples should agree with parser behavior.
+- Keep config honest. A config key should either change observable behavior or
+  be clearly documented as reserved.
+- Preserve compatibility entrypoints and wrappers when a repo provides them.
+- When editing docs or examples, keep command blocks short, runnable, and paired
+  with representative output when that output clarifies success or failure.
+
+## Kujo Runtime Notes
+
+Kujo ecosystem tools often follow these defensive patterns:
+
+- Prefer `while` loops in complex functions.
+- Avoid duplicate local names across branches in the same function.
+- Keep imports at the top of the file.
+- Export functions that are imported by another module.
+- Guard dictionary access with `has_key()` or local helper wrappers.
+- Remember that some builtins return int-like `1`/`0` instead of booleans.
+- Guard parsing operations such as JSON or TOML parsing and validate the result.
+- Keep deep tree walks iterative where recursion risks VM stack limits.
+- Be careful with byte-based string indexes versus character-based substring
+  operations; use existing repo helpers when available.
+
+Fence source has stricter VM rules:
+
+- Use `while` loops; at most one `for` per function.
+- Do not use duplicate `let` names across `if` branches in one function.
+- Imports are `from src.x import name`; do not call qualified `src.x.f()`.
+- Export imported functions with `export func`.
+- Read `ProcessResult` fields via dot access, such as `r.success`.
+- `has_key(...)` and string `contains(...)` return `1`, not `true`; use
+  `dict_has` and `truthy` from `util.kujo`.
+- Multi-line strings use `\n`; escape quotes with `\"`.
+- `pop(a)` returns `[new_array, element]`.
+- Tree walks must be iterative, never recursive.
+- Keep call chains flat, around six user frames or fewer.
+
+## Validation
+
+Before opening a pull request, run the strongest local validation available for
+the repo.
+
+Fence development loop:
+
+```bash
+KUJO=/path/to/kujo
+
+# Lint every source file you touched.
 $KUJO check src/<file>.kujo
 
-# 2) run the full test suite (must stay green)
+# Run the full test suite.
 $KUJO run tests/fence_tests.kujo
+```
 
-# 3) smoke-test against a scratch repo
-TMP=$(mktemp -d); cp -r tests/fixtures/sample/src "$TMP"/; cd "$TMP"
+Smoke-test behavior against a scratch repo when command behavior, config
+templates, resolution, output formats, or path safety changes:
+
+```bash
+TMP="$(mktemp -d)"
+cp -r tests/fixtures/sample/src "$TMP"/
+cd "$TMP"
 $KUJO run /path/to/fence/fence.kujo -- init
 $KUJO run /path/to/fence/fence.kujo -- check --format json
 ```
 
 Every behavior change needs matching assertions in `tests/fence_tests.kujo`.
+Tests should stay offline and deterministic unless the repo explicitly marks a
+live-provider or network test as opt-in.
 
-## Kujo VM rules you must follow
+## Documentation And Changelog
 
-These are verified runtime/compiler constraints (see `agent/DECISIONS.md` D4):
+Update docs when behavior, configuration, command output, flags, schemas,
+examples, or security expectations change.
 
-- Use `while` loops; **at most one `for` per function**.
-- **No duplicate `let` names** across `if` branches in one function.
-- Imports are `from src.x import name`; **no qualified `src.x.f()`**. Export with
-  `export func`.
-- `ProcessResult` fields via dot: `r.success`, `r.stdout`.
-- `has_key(...)` / string `contains(...)` return `1`, not `true` — use
-  `dict_has` / `truthy` from `util.kujo`.
-- Multi-line strings use `\n` (no literal newlines); `\"` escapes a quote.
-- `pop(a)` returns `[new_array, element]`.
-- Tree walks must be iterative (explicit stack), never recursive.
-- Keep call chains flat (~6 user frames max).
+For Fence source changes, check:
 
-## Adding a language extractor
+- `README.md`
+- `docs/getting-started.md`
+- `docs/commands.md`
+- `docs/configuration.md`
+- `docs/ci.md`
+- `docs/architecture.md`
+- `docs/ENHANCEMENTS.md`
+- examples
+- `CHANGELOG.md`
 
-Follow the five steps in
-[docs/architecture.md#adding-a-language-extractor](docs/architecture.md#adding-a-language-extractor).
+User-visible behavior changes should include a changelog entry when the repo has
+a changelog.
 
-## Roadmap
+## Pull Requests
 
-Open work is tracked as an agent-executable checklist in
-[docs/ENHANCEMENTS.md](docs/ENHANCEMENTS.md).
+A good PR includes:
 
-## Commits
+- Problem statement.
+- Change summary.
+- User-visible impact.
+- Test evidence with commands and outcomes.
+- Documentation or changelog updates.
+- Known risks or follow-up work, if any.
 
-Keep commits focused and descriptive. Run lint + tests before pushing.
+Keep generated artifacts out of commits unless the artifact is the reviewed
+output of the change.
+
+## Adding A Language Extractor
+
+Follow the steps in
+`docs/architecture.md#adding-a-language-extractor`.
