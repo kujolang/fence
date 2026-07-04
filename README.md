@@ -1,16 +1,13 @@
-# 🚧 Fence
+# Fence
+
+[![Version](https://img.shields.io/badge/version-1.0.0-black)](https://github.com/kujolang/fence)
+[![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
+[![built with Kujo](https://img.shields.io/badge/built%20with-Kujo-white.svg)](https://github.com/kujolang/kujo)
 
 **Fence prevents architecture-boundary crossings in code.**
 
 A local-first, deterministic architecture-boundary enforcer for Git repositories —
 written entirely in the [Kujo](https://github.com/kujolang/kujo/) programming language.
-
-![Made with Kujo](https://img.shields.io/badge/made%20with-Kujo-5b21b6)
-![Tests](https://img.shields.io/badge/tests-115%20passing-2ea44f)
-![Implementation](https://img.shields.io/badge/implementation-100%25%20Kujo-blue)
-![Network](https://img.shields.io/badge/network-none-lightgrey)
-![License](https://img.shields.io/badge/license-MIT-green)
-![Status](https://img.shields.io/badge/status-v1.0.0-orange)
 
 ---
 
