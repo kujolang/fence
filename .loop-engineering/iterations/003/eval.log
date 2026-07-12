@@ -1,7 +1,36 @@
 
 ## gate: source_checks
-$ for f in fence.kujo src/*.kujo tests/*.kujo; do /Users/robertdevore/2026/Kujolang/kujo-repos/kujo/target/debug/kujo check \"$f\" >/dev/null || exit 1; done
-[KUJOCLI001] [cli] error: Failed to read .kujo file '"fence.kujo"': No such file or directory (os error 2)
+$ for f in fence.kujo src/*.kujo tests/*.kujo; do /Users/robertdevore/2026/Kujolang/kujo-repos/kujo/target/debug/kujo check $f >/dev/null || exit 1; done
+Compiler optimization: 0 constants folded, 11 dead instructions removed, 0 peephole optimizations
+Compiler optimization: 0 constants folded, 11 dead instructions removed, 0 peephole optimizations
+Compiler optimization: 0 constants folded, 28 dead instructions removed, 0 peephole optimizations
+Compiler optimization: 2 constants folded, 12 dead instructions removed, 0 peephole optimizations
+Compiler optimization: 0 constants folded, 13 dead instructions removed, 0 peephole optimizations
+Compiler optimization: 0 constants folded, 45 dead instructions removed, 0 peephole optimizations
+Compiler optimization: 0 constants folded, 8 dead instructions removed, 0 peephole optimizations
+Compiler optimization: 0 constants folded, 20 dead instructions removed, 0 peephole optimizations
+Compiler optimization: 0 constants folded, 15 dead instructions removed, 0 peephole optimizations
+Compiler optimization: 0 constants folded, 7 dead instructions removed, 0 peephole optimizations
+Compiler optimization: 0 constants folded, 9 dead instructions removed, 0 peephole optimizations
+Compiler optimization: 0 constants folded, 13 dead instructions removed, 0 peephole optimizations
+Compiler optimization: 0 constants folded, 13 dead instructions removed, 0 peephole optimizations
+Compiler optimization: 2 constants folded, 36 dead instructions removed, 0 peephole optimizations
+Compiler optimization: 3 constants folded, 61 dead instructions removed, 2 peephole optimizations
+Compiler optimization: 0 constants folded, 17 dead instructions removed, 0 peephole optimizations
+Compiler optimization: 1 constants folded, 66 dead instructions removed, 1 peephole optimizations
+Compiler optimization: 1 constants folded, 17 dead instructions removed, 1 peephole optimizations
+Compiler optimization: 0 constants folded, 4 dead instructions removed, 0 peephole optimizations
+Compiler optimization: 0 constants folded, 16 dead instructions removed, 0 peephole optimizations
+Compiler optimization: 3 constants folded, 43 dead instructions removed, 0 peephole optimizations
+Compiler optimization: 0 constants folded, 35 dead instructions removed, 0 peephole optimizations
+Compiler optimization: 0 constants folded, 62 dead instructions removed, 0 peephole optimizations
+Compiler optimization: 0 constants folded, 38 dead instructions removed, 0 peephole optimizations
+Compiler optimization: 0 constants folded, 25 dead instructions removed, 0 peephole optimizations
+Compiler optimization: 0 constants folded, 17 dead instructions removed, 0 peephole optimizations
+Compiler optimization: 0 constants folded, 47 dead instructions removed, 0 peephole optimizations
+Compiler optimization: 0 constants folded, 5 dead instructions removed, 0 peephole optimizations
+Compiler optimization: 0 constants folded, 4 dead instructions removed, 0 peephole optimizations
+gate source_checks: pass
 
 ## gate: unit_tests
 $ /Users/robertdevore/2026/Kujolang/kujo-repos/kujo/target/debug/kujo run tests/fence_tests.kujo
@@ -17,4 +46,153 @@ gate cli_smoke: pass
 
 ## gate: diff_check
 $ git diff --check
-gate diff_check: pass
+.loop-engineering/iterations/001/diff.patch:7: trailing whitespace.
++ 
+.loop-engineering/iterations/001/eval.log:50: trailing whitespace.
+++ 
+.loop-engineering/iterations/001/gate-diff_check.log:2: trailing whitespace.
+++ 
+.loop-engineering/iterations/002/diff.patch:7: trailing whitespace.
++ 
+.loop-engineering/iterations/002/diff.patch:24: trailing whitespace.
+++ 
+.loop-engineering/iterations/002/diff.patch:35: trailing whitespace.
++ 
+.loop-engineering/iterations/002/diff.patch:70: trailing whitespace.
++ 
+.loop-engineering/iterations/002/diff.patch:74: trailing whitespace.
++ 
+.loop-engineering/iterations/002/diff.patch:79: trailing whitespace.
++++ 
+.loop-engineering/iterations/002/diff.patch:86: trailing whitespace.
++++ 
+.loop-engineering/iterations/002/diff.patch:128: trailing whitespace.
++ 
+.loop-engineering/iterations/002/eval.log:50: trailing whitespace.
+++ 
+.loop-engineering/iterations/002/eval.log:52: trailing whitespace.
++++ 
+.loop-engineering/iterations/002/eval.log:54: trailing whitespace.
++++ 
+.loop-engineering/iterations/002/eval.log:56: trailing whitespace.
+++ 
+.loop-engineering/iterations/002/eval.log:58: trailing whitespace.
++++ 
+.loop-engineering/iterations/002/eval.log:60: trailing whitespace.
+++ 
+.loop-engineering/iterations/002/eval.log:62: trailing whitespace.
+++ 
+.loop-engineering/iterations/002/eval.log:64: trailing whitespace.
+++ 
+.loop-engineering/iterations/002/eval.log:66: trailing whitespace.
+++++ 
+.loop-engineering/iterations/002/eval.log:68: trailing whitespace.
+++++ 
+.loop-engineering/iterations/002/eval.log:70: trailing whitespace.
+++ 
+.loop-engineering/iterations/002/gate-diff_check.log:2: trailing whitespace.
+++ 
+.loop-engineering/iterations/002/gate-diff_check.log:4: trailing whitespace.
++++ 
+.loop-engineering/iterations/002/gate-diff_check.log:6: trailing whitespace.
++++ 
+.loop-engineering/iterations/002/gate-diff_check.log:8: trailing whitespace.
+++ 
+.loop-engineering/iterations/002/gate-diff_check.log:10: trailing whitespace.
++++ 
+.loop-engineering/iterations/002/gate-diff_check.log:12: trailing whitespace.
+++ 
+.loop-engineering/iterations/002/gate-diff_check.log:14: trailing whitespace.
+++ 
+.loop-engineering/iterations/002/gate-diff_check.log:16: trailing whitespace.
+++ 
+.loop-engineering/iterations/002/gate-diff_check.log:18: trailing whitespace.
+++++ 
+.loop-engineering/iterations/002/gate-diff_check.log:20: trailing whitespace.
+++++ 
+.loop-engineering/iterations/002/gate-diff_check.log:22: trailing whitespace.
+++ 
+.loop-engineering/iterations/003/diff.patch:7: trailing whitespace.
++ 
+.loop-engineering/iterations/003/diff.patch:24: trailing whitespace.
+++ 
+.loop-engineering/iterations/003/diff.patch:35: trailing whitespace.
++ 
+.loop-engineering/iterations/003/diff.patch:70: trailing whitespace.
++ 
+.loop-engineering/iterations/003/diff.patch:74: trailing whitespace.
++ 
+.loop-engineering/iterations/003/diff.patch:79: trailing whitespace.
++++ 
+.loop-engineering/iterations/003/diff.patch:86: trailing whitespace.
++++ 
+.loop-engineering/iterations/003/diff.patch:128: trailing whitespace.
++ 
+.loop-engineering/iterations/003/diff.patch:147: trailing whitespace.
+++ 
+.loop-engineering/iterations/003/diff.patch:164: trailing whitespace.
++++ 
+.loop-engineering/iterations/003/diff.patch:175: trailing whitespace.
+++ 
+.loop-engineering/iterations/003/diff.patch:210: trailing whitespace.
+++ 
+.loop-engineering/iterations/003/diff.patch:214: trailing whitespace.
+++ 
+.loop-engineering/iterations/003/diff.patch:219: trailing whitespace.
+++++ 
+.loop-engineering/iterations/003/diff.patch:226: trailing whitespace.
+++++ 
+.loop-engineering/iterations/003/diff.patch:268: trailing whitespace.
+++ 
+.loop-engineering/iterations/003/diff.patch:305: trailing whitespace.
++ 
+.loop-engineering/iterations/003/diff.patch:340: trailing whitespace.
++ 
+.loop-engineering/iterations/003/diff.patch:344: trailing whitespace.
++ 
+.loop-engineering/iterations/003/diff.patch:349: trailing whitespace.
++++ 
+.loop-engineering/iterations/003/diff.patch:351: trailing whitespace.
+++++ 
+.loop-engineering/iterations/003/diff.patch:353: trailing whitespace.
+++++ 
+.loop-engineering/iterations/003/diff.patch:355: trailing whitespace.
++++ 
+.loop-engineering/iterations/003/diff.patch:357: trailing whitespace.
+++++ 
+.loop-engineering/iterations/003/diff.patch:359: trailing whitespace.
++++ 
+.loop-engineering/iterations/003/diff.patch:361: trailing whitespace.
++++ 
+.loop-engineering/iterations/003/diff.patch:363: trailing whitespace.
++++ 
+.loop-engineering/iterations/003/diff.patch:365: trailing whitespace.
++++++ 
+.loop-engineering/iterations/003/diff.patch:367: trailing whitespace.
++++++ 
+.loop-engineering/iterations/003/diff.patch:369: trailing whitespace.
++++ 
+.loop-engineering/iterations/003/diff.patch:376: trailing whitespace.
++++ 
+.loop-engineering/iterations/003/diff.patch:378: trailing whitespace.
+++++ 
+.loop-engineering/iterations/003/diff.patch:380: trailing whitespace.
+++++ 
+.loop-engineering/iterations/003/diff.patch:382: trailing whitespace.
++++ 
+.loop-engineering/iterations/003/diff.patch:384: trailing whitespace.
+++++ 
+.loop-engineering/iterations/003/diff.patch:386: trailing whitespace.
++++ 
+.loop-engineering/iterations/003/diff.patch:388: trailing whitespace.
++++ 
+.loop-engineering/iterations/003/diff.patch:390: trailing whitespace.
++++ 
+.loop-engineering/iterations/003/diff.patch:392: trailing whitespace.
++++++ 
+.loop-engineering/iterations/003/diff.patch:394: trailing whitespace.
++++++ 
+.loop-engineering/iterations/003/diff.patch:396: trailing whitespace.
++++ 
+.loop-engineering/iterations/003/diff.patch:438: trailing whitespace.
++ 

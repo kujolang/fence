@@ -10,9 +10,9 @@ blocked
 
 ## Verification
 
-- passed: unit_tests, cli_smoke, diff_check, unit_tests, cli_smoke, diff_check, unit_tests, cli_smoke, diff_check
+- passed: source_checks, unit_tests, cli_smoke, source_checks, unit_tests, cli_smoke, source_checks, unit_tests, cli_smoke
 - blocked: none
-- failed: source_checks, source_checks, source_checks
+- failed: diff_check, diff_check, diff_check
 
 ## Commits
 
