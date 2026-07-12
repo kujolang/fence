@@ -17,7 +17,7 @@ blocked_actions:
 
 eval_gates:
   - id: source_checks
-    command: "for f in fence.kujo src/*.kujo tests/*.kujo; do /Users/robertdevore/2026/Kujolang/kujo-repos/kujo/target/debug/kujo check \"$f\" >/dev/null || exit 1; done"
+    command: "for f in fence.kujo src/*.kujo tests/*.kujo; do /Users/robertdevore/2026/Kujolang/kujo-repos/kujo/target/debug/kujo check $f >/dev/null || exit 1; done"
   - id: unit_tests
     command: "/Users/robertdevore/2026/Kujolang/kujo-repos/kujo/target/debug/kujo run tests/fence_tests.kujo"
   - id: cli_smoke
