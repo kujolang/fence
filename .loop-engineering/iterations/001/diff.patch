@@ -1,29 +1,46 @@
 diff --git a/.loop-engineering/iterations/001/context.md b/.loop-engineering/iterations/001/context.md
-index f3d6900..04aca27 100644
+index 04aca27..f46e3a4 100644
 --- a/.loop-engineering/iterations/001/context.md
 +++ b/.loop-engineering/iterations/001/context.md
 @@ -1,6 +1,6 @@
  # Context
  
  - objective: Evaluate HLP-004 migration to the first-party CLI parser package while preserving Fence safety and boundary validation semantics.
--- git_head: a0b0c5a
-+- git_head: 32858f7
+-- git_head: 32858f7
++- git_head: 2647dbf
  - changed_files:
    - none
 diff --git a/.loop-engineering/iterations/001/diff.patch b/.loop-engineering/iterations/001/diff.patch
-index 097c0bf..e69de29 100644
+index 4d7ad75..e69de29 100644
 --- a/.loop-engineering/iterations/001/diff.patch
 +++ b/.loop-engineering/iterations/001/diff.patch
-@@ -1,12 +0,0 @@
+@@ -1,29 +0,0 @@
 -diff --git a/.loop-engineering/iterations/001/context.md b/.loop-engineering/iterations/001/context.md
--index f2351bc..f3d6900 100644
+-index f3d6900..04aca27 100644
 ---- a/.loop-engineering/iterations/001/context.md
 -+++ b/.loop-engineering/iterations/001/context.md
 -@@ -1,6 +1,6 @@
 - # Context
 - 
 - - objective: Evaluate HLP-004 migration to the first-party CLI parser package while preserving Fence safety and boundary validation semantics.
---- git_head: 3dea70f
--+- git_head: a0b0c5a
+--- git_head: a0b0c5a
+-+- git_head: 32858f7
 - - changed_files:
 -   - none
+-diff --git a/.loop-engineering/iterations/001/diff.patch b/.loop-engineering/iterations/001/diff.patch
+-index 097c0bf..e69de29 100644
+---- a/.loop-engineering/iterations/001/diff.patch
+-+++ b/.loop-engineering/iterations/001/diff.patch
+-@@ -1,12 +0,0 @@
+--diff --git a/.loop-engineering/iterations/001/context.md b/.loop-engineering/iterations/001/context.md
+--index f2351bc..f3d6900 100644
+----- a/.loop-engineering/iterations/001/context.md
+--+++ b/.loop-engineering/iterations/001/context.md
+--@@ -1,6 +1,6 @@
+-- # Context
+-- 
+-- - objective: Evaluate HLP-004 migration to the first-party CLI parser package while preserving Fence safety and boundary validation semantics.
+---- git_head: 3dea70f
+--+- git_head: a0b0c5a
+-- - changed_files:
+--   - none
