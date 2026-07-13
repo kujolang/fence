@@ -10,7 +10,16 @@
 
 set -u
 KUJO="${KUJO:-kujo}"
-FENCE="$(CDPATH= cd "$(dirname "$0")/.." && pwd)/fence.kujo"
+ROOT="$(CDPATH= cd "$(dirname "$0")/.." && pwd)"
+if [ "${KUJO#/}" = "$KUJO" ] && [ -x "$ROOT/$KUJO" ]; then
+  KUJO="$ROOT/$KUJO"
+fi
+if [ -n "${KUJO_MODULE_PATH:-}" ] && [ "${KUJO_MODULE_PATH#/}" = "$KUJO_MODULE_PATH" ] && [ -d "$ROOT/$KUJO_MODULE_PATH" ]; then
+  export KUJO_MODULE_PATH="$ROOT/$KUJO_MODULE_PATH"
+elif [ -z "${KUJO_MODULE_PATH:-}" ] && [ -d "$ROOT/../kujo/modules" ]; then
+  export KUJO_MODULE_PATH="$ROOT/../kujo/modules"
+fi
+FENCE="$ROOT/fence.kujo"
 PASS=0
 FAIL=0
 

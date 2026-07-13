@@ -17,11 +17,11 @@ blocked_actions:
 
 eval_gates:
   - id: source_checks
-    command: "for f in fence.kujo src/*.kujo tests/*.kujo; do /Users/robertdevore/2026/Kujolang/kujo-repos/kujo/target/debug/kujo check $f >/dev/null || exit 1; done"
+    command: "KUJO_MODULE_PATH=/Users/robertdevore/2026/Kujolang/kujo-repos/kujo/modules; export KUJO_MODULE_PATH; for f in fence.kujo src/*.kujo tests/*.kujo; do /Users/robertdevore/2026/Kujolang/kujo-repos/kujo/target/debug/kujo check $f >/dev/null || exit 1; done"
   - id: unit_tests
-    command: "/Users/robertdevore/2026/Kujolang/kujo-repos/kujo/target/debug/kujo run tests/fence_tests.kujo"
+    command: "KUJO_MODULE_PATH=/Users/robertdevore/2026/Kujolang/kujo-repos/kujo/modules; export KUJO_MODULE_PATH; /Users/robertdevore/2026/Kujolang/kujo-repos/kujo/target/debug/kujo run tests/fence_tests.kujo"
   - id: cli_smoke
-    command: "KUJO=/Users/robertdevore/2026/Kujolang/kujo-repos/kujo/target/debug/kujo bash tests/cli_smoke.sh"
+    command: "KUJO=/Users/robertdevore/2026/Kujolang/kujo-repos/kujo/target/debug/kujo KUJO_MODULE_PATH=/Users/robertdevore/2026/Kujolang/kujo-repos/kujo/modules bash tests/cli_smoke.sh"
   - id: diff_check
     command: 'files=$(git diff --name-only | grep -v "^.loop-engineering/" || true); if [ -n "$files" ]; then git diff --check -- $files; fi'
     required: true

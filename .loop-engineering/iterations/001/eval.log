@@ -1,10 +1,10 @@
 
 ## gate: source_checks
-$ for f in fence.kujo src/*.kujo tests/*.kujo; do /Users/robertdevore/2026/Kujolang/kujo-repos/kujo/target/debug/kujo check $f >/dev/null || exit 1; done
+$ KUJO_MODULE_PATH=/Users/robertdevore/2026/Kujolang/kujo-repos/kujo/modules; export KUJO_MODULE_PATH; for f in fence.kujo src/*.kujo tests/*.kujo; do /Users/robertdevore/2026/Kujolang/kujo-repos/kujo/target/debug/kujo check $f >/dev/null || exit 1; done
 Compiler optimization: 0 constants folded, 11 dead instructions removed, 0 peephole optimizations
 Compiler optimization: 0 constants folded, 11 dead instructions removed, 0 peephole optimizations
 Compiler optimization: 0 constants folded, 28 dead instructions removed, 0 peephole optimizations
-Compiler optimization: 2 constants folded, 12 dead instructions removed, 0 peephole optimizations
+Compiler optimization: 0 constants folded, 7 dead instructions removed, 0 peephole optimizations
 Compiler optimization: 0 constants folded, 13 dead instructions removed, 0 peephole optimizations
 Compiler optimization: 0 constants folded, 45 dead instructions removed, 0 peephole optimizations
 Compiler optimization: 0 constants folded, 8 dead instructions removed, 0 peephole optimizations
@@ -33,13 +33,13 @@ Compiler optimization: 0 constants folded, 4 dead instructions removed, 0 peepho
 gate source_checks: pass
 
 ## gate: unit_tests
-$ /Users/robertdevore/2026/Kujolang/kujo-repos/kujo/target/debug/kujo run tests/fence_tests.kujo
+$ KUJO_MODULE_PATH=/Users/robertdevore/2026/Kujolang/kujo-repos/kujo/modules; export KUJO_MODULE_PATH; /Users/robertdevore/2026/Kujolang/kujo-repos/kujo/target/debug/kujo run tests/fence_tests.kujo
 
 Fence tests: 115 passed, 0 failed
 gate unit_tests: pass
 
 ## gate: cli_smoke
-$ KUJO=/Users/robertdevore/2026/Kujolang/kujo-repos/kujo/target/debug/kujo bash tests/cli_smoke.sh
+$ KUJO=/Users/robertdevore/2026/Kujolang/kujo-repos/kujo/target/debug/kujo KUJO_MODULE_PATH=/Users/robertdevore/2026/Kujolang/kujo-repos/kujo/modules bash tests/cli_smoke.sh
 
 CLI smoke: 16 passed, 0 failed
 gate cli_smoke: pass
