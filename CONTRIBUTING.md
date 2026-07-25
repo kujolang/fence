@@ -30,8 +30,8 @@ Use the Kujo runtime expected by this repository. Most repos support one of
 these environment variables:
 
 ```bash
-export KUJO_BIN=/path/to/kujo
-export KUJO=/path/to/kujo
+export KUJO_BIN=kujo
+export KUJO=kujo
 ```
 
 Fence entry points:
@@ -130,7 +130,7 @@ the repo.
 Fence development loop:
 
 ```bash
-KUJO=/path/to/kujo
+KUJO=kujo
 
 # Lint every source file you touched.
 $KUJO check src/<file>.kujo

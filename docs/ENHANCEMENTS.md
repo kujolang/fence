@@ -9,7 +9,7 @@ or reviewer can verify.
 
 - Implementation stays **Kujo-only** (`.kujo` files). No Rust/JS/Python/Go/PHP in
   the tool itself; an optional one-line shell wrapper is the only exception.
-- Use the local Kujo binary at `/path/to/kujo/target/release/kujo`.
+- Use the local Kujo binary at `kujo`.
 - Validate every change: `kujo check <file>.kujo` for each touched file, and
   `kujo run tests/fence_tests.kujo` (must stay green; add assertions for new code).
 - Respect Kujo VM quirks already encoded in this repo (see `agent/DECISIONS.md`
@@ -247,7 +247,7 @@ or reviewer can verify.
 ## How to verify the whole suite after changes
 
 ```bash
-KUJO=/path/to/kujo/target/release/kujo
+KUJO=kujo
 # 1) lint every source file
 for f in fence.kujo src/*.kujo tests/*.kujo; do $KUJO check "$f"; done
 # 2) unit tests (must stay green; add assertions for new code)

@@ -13,7 +13,7 @@ these items would make Fence more universally useful in larger enterprise repos.
 - Validate with:
 
 ```bash
-KUJO=/Users/robertdevore/2026/Kujolang/kujo-repos/kujo/target/release/kujo
+KUJO=kujo
 for f in fence.kujo src/*.kujo tests/*.kujo; do $KUJO check "$f"; done
 $KUJO run tests/fence_tests.kujo
 $KUJO run fence.kujo -- validate
