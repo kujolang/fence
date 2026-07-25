@@ -26,12 +26,10 @@ For Fence specifically:
 
 ## Local Setup
 
-Use the Kujo runtime expected by this repository. Most repos support one of
-these environment variables:
+Install Kujo so the `kujo` command is available on your `PATH`:
 
 ```bash
-export KUJO_BIN=kujo
-export KUJO=kujo
+kujo --version
 ```
 
 Fence entry points:
@@ -130,13 +128,11 @@ the repo.
 Fence development loop:
 
 ```bash
-KUJO=kujo
-
 # Lint every source file you touched.
-$KUJO check src/<file>.kujo
+kujo check src/<file>.kujo
 
 # Run the full test suite.
-$KUJO run tests/fence_tests.kujo
+kujo run tests/fence_tests.kujo
 ```
 
 Smoke-test behavior against a scratch repo when command behavior, config
@@ -146,8 +142,8 @@ templates, resolution, output formats, or path safety changes:
 TMP="$(mktemp -d)"
 cp -r tests/fixtures/sample/src "$TMP"/
 cd "$TMP"
-$KUJO run /path/to/fence/fence.kujo -- init
-$KUJO run /path/to/fence/fence.kujo -- check --format json
+kujo run /path/to/fence/fence.kujo -- init
+kujo run /path/to/fence/fence.kujo -- check --format json
 ```
 
 Every behavior change needs matching assertions in `tests/fence_tests.kujo`.
