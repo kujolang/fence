@@ -38,6 +38,11 @@ printf 'export const ok = 1\n' > src/ui/Clean.tsx
 
 # init -> 0
 expect_exit 0 "$(run init)" "init creates config"
+# direct help/version entrypoints -> 0
+expect_exit 0 "$(run help)" "help command"
+expect_exit 0 "$(run version)" "version command"
+expect_exit 0 "$(run --help)" "bare --help"
+expect_exit 0 "$(run --version)" "bare --version"
 # init again without --force -> 2
 expect_exit 2 "$(run init)" "init refuses overwrite"
 # init --force -> 0
