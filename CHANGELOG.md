@@ -7,6 +7,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- Launch readiness spec and deterministic Eval suite for prelaunch review evidence.
 - Python grouped imports such as `import os, package.module as alias` now emit
   one dependency record per imported module.
 - Tests cover grouped Python imports, leading-dash Git refs, and `.git/` output

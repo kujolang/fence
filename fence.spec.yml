@@ -1,0 +1,70 @@
+# Spec - Fence launch readiness review
+
+name: "Fence launch readiness review"
+goal: "Keep Fence locally release-ready as a Kujo-native architecture-boundary checker with deterministic offline reports and CI-friendly gate behavior."
+version: "0.1.0"
+background: "Fence is part of the Kujo prelaunch ecosystem review. The verified scope is local architecture-boundary enforcement from repo-local config; target CI rollout and organization-specific architecture policy remain external."
+scope: "Repository-local CLI behavior, config validation, import scanning, boundary reports, graph output, docs/readiness wording, and launch evidence capture."
+non_goals:
+  - "Publishing packages or public releases"
+  - "Changing branch protection or hosted CI settings"
+  - "Claiming enterprise-wide architecture governance without target-repo rollout proof"
+relevant_systems:
+  - "Kujo runtime"
+  - "Fence CLI"
+  - "repo-local fence.toml"
+  - "prelaunch launch evidence packet"
+likely_files:
+  - "README.md"
+  - "docs/commands.md"
+  - "docs/configuration.md"
+  - "docs/ci.md"
+  - "fence.kujo"
+  - "src/"
+  - "tests/fence_tests.kujo"
+acceptance_criteria:
+  - "Help/version, doctor, validate, check, and graph commands run locally."
+  - "Kujo static checks and Fence test harness pass locally."
+  - "CLI smoke script passes locally."
+  - "Eval suite proves deterministic expected command outputs where practical."
+  - "ShipCheck and Concord pass locally."
+  - "CI and enterprise governance claims remain scoped to target-repository rollout proof."
+eval_requirements:
+  - description: "Run Fence version smoke."
+    check_type: "command"
+    params:
+      command: "kujo run fence.kujo -- version"
+  - description: "Run Fence static check."
+    check_type: "command"
+    params:
+      command: "kujo check fence.kujo"
+  - description: "Run Fence test harness."
+    check_type: "command"
+    params:
+      command: "kujo run tests/fence_tests.kujo"
+  - description: "Run Fence repo check."
+    check_type: "command"
+    params:
+      command: "kujo run fence.kujo -- check --format json"
+risks:
+  - risk: "Best-effort line-based import detection can miss language-specific edge cases."
+    mitigation: "Keep limitations documented and require target-repo validation before governance claims."
+    severity: "medium"
+  - risk: "Enterprise architecture enforcement depends on organization-specific configs and CI rollout."
+    mitigation: "Treat branch protection, CI installation, and target-repo policy adoption as external launch actions."
+    severity: "high"
+dependencies:
+  - "kujo on PATH"
+  - "repo-local fence.toml for the project being checked"
+review_expectations:
+  - "Review JSON/SARIF/Markdown report contracts before automation integration."
+  - "Review target-repo fence.toml and CI enforcement before claiming governance coverage."
+human_approval_points:
+  - "Before publishing packages or public releases"
+  - "Before changing GitHub branch protection or hosted CI settings"
+  - "Before production or enterprise governance claims"
+priority: "high"
+tags:
+  - "kujo"
+  - "fence"
+  - "launch-readiness"
