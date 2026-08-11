@@ -153,10 +153,21 @@ export func extract_javascript(content) {
         if in_comment {
             if contains(line, "*/") == 1 {
                 in_comment = false
+                let close_at = index_of(line, "*/")
+                let after_comment = trim(substring(line, close_at + 2, len(line)))
+                if after_comment != "" {
+                    out = js_scan_line(out, after_comment)
+                }
             }
         } else {
             if is_js_comment_open(line) {
-                if contains(line, "*/") == 0 {
+                if contains(line, "*/") == 1 {
+                    let close_inline = index_of(line, "*/")
+                    let after_inline = trim(substring(line, close_inline + 2, len(line)))
+                    if after_inline != "" {
+                        out = js_scan_line(out, after_inline)
+                    }
+                } else {
                     in_comment = true
                 }
             } else {
@@ -187,23 +198,41 @@ func is_line_comment(line) {
 }
 
 func js_scan_line(out, line) {
-    let path = first_quoted(line)
-    if path == "" {
-        return out
-    }
     if regex_match(line, "\\bfrom\\s*['\"]") {
-        return push(out, rec("from", path, line))
+        let from_path = quoted_after(line, "from")
+        if from_path != "" {
+            return push(out, rec("from", from_path, line))
+        }
     }
     if regex_match(line, "\\brequire\\s*\\(\\s*['\"]") {
-        return push(out, rec("require", path, line))
+        let require_path = quoted_after(line, "require")
+        if require_path != "" {
+            return push(out, rec("require", require_path, line))
+        }
     }
     if regex_match(line, "\\bimport\\s*\\(\\s*['\"]") {
-        return push(out, rec("dynamic", path, line))
+        let dynamic_path = quoted_after(line, "import")
+        if dynamic_path != "" {
+            return push(out, rec("dynamic", dynamic_path, line))
+        }
     }
     if regex_match(line, "^import\\s+['\"]") {
-        return push(out, rec("import", path, line))
+        let side_effect_path = quoted_after(line, "import")
+        if side_effect_path != "" {
+            return push(out, rec("import", side_effect_path, line))
+        }
     }
     return out
+}
+
+// Extract the first quoted string after a matched import keyword, rather than
+// the first string on the whole line (which may belong to earlier code).
+func quoted_after(line, keyword) {
+    let at = index_of(line, keyword)
+    if at < 0 {
+        return ""
+    }
+    return first_quoted(substring(line, at + len(keyword), len(line)))
 }
 
 // Dispatch by extension. Returns [] for unknown/unsupported extensions.

@@ -87,7 +87,14 @@ export func extract_php(content) {
             out = push(out, rec("use", strip_trailing(parts[1]), line))
         } else {
             if regex_match(line, "\\b(require_once|require|include_once|include)\\b") {
-                let path = first_quoted(line)
+                mut path = first_quoted(line)
+                if contains(line, "__DIR__") == 1 {
+                    if starts_with(path, "/") {
+                        path = "." + path
+                    } else {
+                        path = "./" + path
+                    }
+                }
                 if path != "" {
                     out = push(out, rec("require", path, line))
                 }
@@ -126,7 +133,7 @@ export func extract_go(content) {
             if regex_match(line, "^import\\s*\\(") {
                 in_block = true
             } else {
-                if regex_match(line, "^import\\s+['\"]") {
+                if regex_match(line, "^import\\s+([._A-Za-z0-9]+\\s+)?['\"]") {
                     let path = first_quoted(line)
                     if path != "" {
                         out = push(out, rec("import", path, line))

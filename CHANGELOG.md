@@ -6,6 +6,14 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- Reject invalid `--fail-on` overrides and malformed baseline schemas instead
+  of silently passing or misapplying them.
+- Correct JavaScript import-string selection and imports following inline block
+  comments, Go aliased single imports, and PHP `__DIR__` includes.
+- Resolve Rust `mod`, `self::`, and `super::` paths relative to their declaring
+  modules, and prefer the longest matching configured alias prefix.
+
 ### Added
 - Launch readiness spec and deterministic Eval suite for prelaunch review evidence.
 - Python grouped imports such as `import os, package.module as alias` now emit

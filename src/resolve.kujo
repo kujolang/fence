@@ -11,7 +11,7 @@
 // "unknown"  => looked internal (relative or aliased) but did not resolve;
 //               subject to unknown_dependency_policy.
 
-from src.paths import normalize_sep, parent_dir
+from src.paths import normalize_sep, parent_dir, file_ext
 from src.util import dict_has
 
 // Candidate file extensions tried for extensionless imports.
@@ -147,19 +147,57 @@ func module_to_path(raw) {
 func apply_alias(raw, aliases) {
     let names = keys(aliases)
     let n = len(names)
+    mut best_key = ""
+    mut best_target = ""
     mut i = 0
     while i < n {
         let key = names[i]
         let target = aliases[key]
         // Exact alias or alias-prefixed path: "@" or "@/foo".
         if raw == key {
-            return target
-        }
-        if starts_with(raw, key + "/") {
-            let rest = substring(raw, len(key) + 1, len(raw))
-            return target + "/" + rest
+            if len(key) > len(best_key) {
+                best_key = key
+                best_target = target
+            }
+        } else {
+            if starts_with(raw, key + "/") {
+                if len(key) > len(best_key) {
+                    best_key = key
+                    best_target = target
+                }
+            }
         }
         i = i + 1
+    }
+    if best_key == "" {
+        return ""
+    }
+    if raw == best_key {
+        return best_target
+    }
+    let rest = substring(raw, len(best_key) + 1, len(raw))
+    return best_target + "/" + rest
+}
+
+// Resolve Rust module-relative paths. `self` starts beside the current module,
+// each `super` ascends one module directory, and a bare module name is first
+// tried beside the importing file (the form emitted for `mod child;`).
+func rust_relative_base(raw, current_file) {
+    mut p = replace(raw, "::", "/")
+    mut dir = parent_dir(current_file)
+    if starts_with(p, "self/") {
+        p = substring(p, 5, len(p))
+        return dir + "/" + p
+    }
+    if starts_with(p, "super/") {
+        while starts_with(p, "super/") {
+            dir = parent_dir(dir)
+            p = substring(p, 6, len(p))
+        }
+        return dir + "/" + p
+    }
+    if contains(raw, "::") == 0 {
+        return dir + "/" + raw
     }
     return ""
 }
@@ -217,7 +255,18 @@ export func resolve_import(raw, current_file, source_roots, aliases) {
         }
     }
 
-    // 3. Alias prefix.
+    // 3. Rust module-relative imports (`mod child`, `self::`, `super::`).
+    if file_ext(current_file) == ".rs" {
+        let rust_base = rust_relative_base(raw, current_file)
+        if rust_base != "" {
+            let r_rust = try_candidates(rust_base)
+            if r_rust != "" {
+                return mk("internal", r_rust, raw)
+            }
+        }
+    }
+
+    // 4. Alias prefix.
     let aliased = apply_alias(raw, aliases)
     if aliased != "" {
         let r_alias = try_candidates(aliased)
@@ -227,7 +276,7 @@ export func resolve_import(raw, current_file, source_roots, aliases) {
         return mk("unknown", "", raw)
     }
 
-    // 4. Root-relative / dotted module path.
+    // 5. Root-relative / dotted module path.
     let modpath = module_to_path(raw)
     let direct = try_candidates(modpath)
     if direct != "" {
@@ -238,7 +287,7 @@ export func resolve_import(raw, current_file, source_roots, aliases) {
         return mk("internal", under, raw)
     }
 
-    // 5. Anything else is an external package.
+    // 6. Anything else is an external package.
     return mk("external", "", raw)
 }
 

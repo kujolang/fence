@@ -182,7 +182,7 @@ plus `.git`, parent-traversal, absolute-path, and symlink-escape guards). See
 ```
 fence.kujo              entry point (args -> dispatch -> exit code)
 src/*.kujo              implementation modules (see docs/architecture.md)
-tests/fence_tests.kujo  run-mode test harness (115 assertions)
+tests/fence_tests.kujo  run-mode test harness (123 assertions)
 docs/                   documentation
 agent/                  ignored archive of implementation prompts and handoffs
 ```

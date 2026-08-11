@@ -117,10 +117,14 @@ eq("py grouped import second", extract_for_ext(".py", "import os, src.database.u
 eq("js from", extract_for_ext(".ts", "import x from \"./x\"")[0]["path"], "./x")
 eq("js require", extract_for_ext(".js", "const z = require('./z')")[0]["path"], "./z")
 eq("js dynamic", extract_for_ext(".ts", "const w = await import('./w')")[0]["kind"], "dynamic")
+eq("js import after earlier string", extract_for_ext(".ts", "const label = 'x'; const z = require('./z')")[0]["path"], "./z")
+eq("js import after inline block comment", extract_for_ext(".ts", "/* note */ import x from './x'")[0]["path"], "./x")
 eq("rust use", extract_for_ext(".rs", "use crate::domain::User;")[0]["path"], "crate::domain::User")
 eq("rust mod", extract_for_ext(".rs", "pub mod engine;")[0]["kind"], "mod")
 eq("php use", extract_for_ext(".php", "use App\\Domain\\User;")[0]["path"], "App\\Domain\\User")
 eq("go block", len(extract_for_ext(".go", "import (\n  \"fmt\"\n  \"myapp/shared\"\n)")), 2)
+eq("go aliased single import", extract_for_ext(".go", "import shared \"myapp/shared\"")[0]["path"], "myapp/shared")
+eq("php dirname require", extract_for_ext(".php", "require_once __DIR__ . '/x.php';")[0]["path"], "./x.php")
 
 // ---- resolution (against tests/fixtures/sample) ----
 let roots = ["tests/fixtures/sample/src"]
@@ -136,6 +140,13 @@ let r_unknown = resolve_import("./missing", "tests/fixtures/sample/src/ui/Login.
 eq("resolve unknown", r_unknown["status"], "unknown")
 let r_py = resolve_import("..database", "tests/fixtures/sample/src/domain/user.py", roots, aliases)
 eq("resolve py rel", r_py["status"], "internal")
+let rust_parent = "tests/fixtures/sample/src/rust/parent/mod.rs"
+eq("resolve rust nested mod", resolve_import("child", rust_parent, roots, aliases)["resolved"], "tests/fixtures/sample/src/rust/parent/child.rs")
+eq("resolve rust self module", resolve_import("self::child", rust_parent, roots, aliases)["resolved"], "tests/fixtures/sample/src/rust/parent/child.rs")
+let rust_nested = "tests/fixtures/sample/src/rust/parent/nested/mod.rs"
+eq("resolve rust super module", resolve_import("super::sibling", rust_nested, roots, aliases)["resolved"], "tests/fixtures/sample/src/rust/parent/sibling.rs")
+let longest_aliases = { "@": "tests/fixtures/sample/src", "@/data": "tests/fixtures/sample/src/database" }
+eq("resolve longest alias prefix", resolve_import("@/data/users", "tests/fixtures/sample/src/ui/Login.tsx", roots, longest_aliases)["resolved"], "tests/fixtures/sample/src/database/users.ts")
 
 // ---- zones + rules ----
 let zones = cfg["zones"]
