@@ -67,6 +67,9 @@ printf 'import { users } from "../database/users"\n' > src/ui/Bad.tsx
 expect_exit 1 "$(run check)" "check with violation fails"
 # fail-on none -> 0 despite violation
 expect_exit 0 "$(run check --fail-on none)" "fail-on none does not fail"
+# Invalid threshold values are usage errors, not an implicit pass.
+expect_exit 2 "$(run check --fail-on bogus)" "invalid fail-on is rejected"
+expect_exit 2 "$(run check --fail-on)" "missing fail-on value is rejected"
 
 # Baseline lifecycle
 expect_exit 0 "$(run baseline create)" "baseline create"
@@ -74,6 +77,9 @@ expect_exit 0 "$(run check --baseline)" "check --baseline suppresses"
 printf 'import { y } from "../database/orders"\n' >> src/ui/Bad.tsx
 printf 'export const y = 1\n' > src/database/orders.ts
 expect_exit 1 "$(run check --baseline)" "check --baseline fails on new violation"
+# A syntactically-valid but structurally-invalid baseline must not be accepted.
+printf '{"schema_version":1,"tool":"fence","fingerprints":"not-an-array"}\n' > fence-baseline.json
+expect_exit 3 "$(run check --baseline)" "invalid baseline schema is rejected"
 
 # Determinism: json output identical across two runs
 A="$("$KUJO" run "$FENCE" -- check --format json 2>/dev/null)"

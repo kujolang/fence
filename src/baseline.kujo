@@ -63,11 +63,44 @@ export func load_baseline() {
     if ok == false {
         return { "found": true, "ok": false, "fingerprints": [] }
     }
-    mut fps = []
-    if dict_has(parsed, "fingerprints") {
-        fps = parsed["fingerprints"]
+    if type_of(parsed) != "dict" {
+        return { "found": true, "ok": false, "fingerprints": [] }
+    }
+    if dict_has(parsed, "schema_version") == false {
+        return { "found": true, "ok": false, "fingerprints": [] }
+    }
+    if parsed["schema_version"] != 1 {
+        return { "found": true, "ok": false, "fingerprints": [] }
+    }
+    if dict_has(parsed, "tool") == false {
+        return { "found": true, "ok": false, "fingerprints": [] }
+    }
+    if parsed["tool"] != "fence" {
+        return { "found": true, "ok": false, "fingerprints": [] }
+    }
+    if dict_has(parsed, "fingerprints") == false {
+        return { "found": true, "ok": false, "fingerprints": [] }
+    }
+    let fps = parsed["fingerprints"]
+    if valid_fingerprints(fps) == false {
+        return { "found": true, "ok": false, "fingerprints": [] }
     }
     return { "found": true, "ok": true, "fingerprints": fps }
+}
+
+func valid_fingerprints(fps) {
+    if type_of(fps) != "array" {
+        return false
+    }
+    let n = len(fps)
+    mut i = 0
+    while i < n {
+        if type_of(fps[i]) != "string" {
+            return false
+        }
+        i = i + 1
+    }
+    return true
 }
 
 // Remove violations whose fingerprint is in the baseline. Returns a new result

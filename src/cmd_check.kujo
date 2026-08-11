@@ -27,16 +27,18 @@ export func cmd_check(parsed) {
     }
 
     mut cfg = loaded["config"]
+
+    // Optional fail-on override. Apply it before validation so an invalid CLI
+    // value cannot silently behave like `none` in the summary threshold.
+    let fail_override = flag_or(flags, "fail-on", "")
+    if has_flag(flags, "fail-on") {
+        cfg["fail_on"] = fail_override
+    }
+
     let diags = validate_config(cfg)
     if count_errors(diags) > 0 {
         print("Config is invalid. Run `kujo run fence.kujo -- validate` for details.")
         return 2
-    }
-
-    // Optional fail-on override.
-    let fail_override = flag_or(flags, "fail-on", "")
-    if fail_override != "" {
-        cfg["fail_on"] = fail_override
     }
 
     // Determine the file set (full walk or changed-only).
@@ -58,7 +60,7 @@ export func cmd_check(parsed) {
             return 2
         }
         if bl["ok"] == false {
-            print("Error: fence-baseline.json is not valid JSON.")
+            print("Error: fence-baseline.json has invalid JSON or an unsupported schema.")
             return 3
         }
         let applied = apply_baseline(result, bl["fingerprints"])
