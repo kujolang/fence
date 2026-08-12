@@ -1,11 +1,11 @@
 // src/imports_ext.kujo
 // Best-effort import extractors for Rust, PHP, and Go.
-// Same record shape as imports.kujo: { kind, path, raw }.
+// Same record shape as imports.kujo: { kind, path, raw, line }.
 //
 // These languages are SCANNED targets only. Fence itself is written in Kujo.
 
-func rec(kind, path, raw) {
-    return { "kind": kind, "path": path, "raw": raw }
+func rec(kind, path, raw, line) {
+    return { "kind": kind, "path": path, "raw": raw, "line": line }
 }
 
 func to_lines(content) {
@@ -56,19 +56,46 @@ export func extract_rust(content) {
     while i < n {
         let line = clean_line(lines[i])
         if regex_match(line, "^use\\s+[A-Za-z0-9_:]+") {
-            let parts = regex_split(line, "\\s+")
-            // parts[1] is the path; strip trailing ; and any "as alias".
-            let p = strip_trailing(parts[1])
-            out = push(out, rec("use", p, line))
+            // Preserve grouped imports containing spaces after commas.
+            let p = strip_trailing(substring(line, 4, len(line)))
+            out = add_rust_use(out, p, line, i + 1)
         } else {
             if regex_match(line, "^(pub\\s+)?mod\\s+[A-Za-z0-9_]+\\s*;") {
                 let m = regex_replace(line, "^(pub\\s+)?mod\\s+", "")
-                out = push(out, rec("mod", strip_trailing(m), line))
+                out = push(out, rec("mod", strip_trailing(m), line, i + 1))
             }
         }
         i = i + 1
     }
     return out
+}
+
+// Expand `use crate::domain::{User, Role};` so each grouped dependency is
+// independently resolvable and reportable. Nested groups remain best-effort.
+func add_rust_use(out, path, raw, line_number) {
+    let open_at = index_of(path, "{")
+    let close_at = index_of(path, "}")
+    if open_at < 0 || close_at <= open_at {
+        return push(out, rec("use", path, raw, line_number))
+    }
+    let prefix = substring(path, 0, open_at)
+    let body = substring(path, open_at + 1, close_at)
+    let items = split(body, ",")
+    let n = len(items)
+    mut res = out
+    mut i = 0
+    while i < n {
+        let item = trim(items[i])
+        if item != "" {
+            if item == "self" {
+                res = push(res, rec("use", regex_replace(prefix, "::$", ""), raw, line_number))
+            } else {
+                res = push(res, rec("use", prefix + item, raw, line_number))
+            }
+        }
+        i = i + 1
+    }
+    return res
 }
 
 // ---- PHP ----
@@ -82,9 +109,10 @@ export func extract_php(content) {
     mut i = 0
     while i < n {
         let line = clean_line(lines[i])
-        if regex_match(line, "^use\\s+[A-Za-z0-9_\\\\]+") {
+        if regex_match(line, "^use\\s+\\\\?[A-Za-z0-9_\\\\]+") {
             let parts = regex_split(line, "\\s+")
-            out = push(out, rec("use", strip_trailing(parts[1]), line))
+            let namespace = regex_replace(strip_trailing(parts[1]), "^\\\\", "")
+            out = push(out, rec("use", namespace, line, i + 1))
         } else {
             if regex_match(line, "\\b(require_once|require|include_once|include)\\b") {
                 mut path = first_quoted(line)
@@ -96,7 +124,7 @@ export func extract_php(content) {
                     }
                 }
                 if path != "" {
-                    out = push(out, rec("require", path, line))
+                    out = push(out, rec("require", path, line, i + 1))
                 }
             }
         }
@@ -126,7 +154,7 @@ export func extract_go(content) {
             } else {
                 let path = first_quoted(line)
                 if path != "" {
-                    out = push(out, rec("import", path, line))
+                    out = push(out, rec("import", path, line, i + 1))
                 }
             }
         } else {
@@ -136,7 +164,7 @@ export func extract_go(content) {
                 if regex_match(line, "^import\\s+([._A-Za-z0-9]+\\s+)?['\"]") {
                     let path = first_quoted(line)
                     if path != "" {
-                        out = push(out, rec("import", path, line))
+                        out = push(out, rec("import", path, line, i + 1))
                     }
                 }
             }

@@ -157,6 +157,39 @@ export func template_feature_sliced() {
     return o
 }
 
+// Generic workspace: deployable apps depend on reusable packages, never the
+// reverse. Teams can split the broad package zone after the first successful
+// rollout without changing the adoption path.
+export func template_monorepo() {
+    mut o = header()
+    o = o + lines([
+        "version = 1",
+        "source_roots = [\"apps\", \"packages\", \"tools\"]",
+        "default_severity = \"error\"",
+        "fail_on = \"error\"",
+        "unknown_dependency_policy = \"warn\"",
+        "",
+        "[scan]",
+        "include = [",
+        "  \"apps/**/*.ts\", \"apps/**/*.tsx\", \"apps/**/*.js\", \"apps/**/*.jsx\",",
+        "  \"apps/**/*.py\", \"apps/**/*.rs\", \"apps/**/*.php\", \"apps/**/*.go\", \"apps/**/*.kujo\",",
+        "  \"packages/**/*.ts\", \"packages/**/*.tsx\", \"packages/**/*.js\", \"packages/**/*.jsx\",",
+        "  \"packages/**/*.py\", \"packages/**/*.rs\", \"packages/**/*.php\", \"packages/**/*.go\", \"packages/**/*.kujo\",",
+        "  \"tools/**/*.ts\", \"tools/**/*.js\", \"tools/**/*.py\", \"tools/**/*.go\", \"tools/**/*.kujo\"",
+        "]",
+        "exclude = [\"node_modules/**\", \"vendor/**\", \"dist/**\", \"build/**\", \"coverage/**\", \".git/**\", \"**/*.generated.*\"]",
+        "",
+        "[aliases]",
+        "\"@apps\" = \"apps\"",
+        "\"@packages\" = \"packages\"",
+        ""
+    ])
+    o = o + zone("applications", "[\"apps/**\"]", "[\"packages\"]", "[\"tooling\"]", "error")
+    o = o + zone("packages", "[\"packages/**\"]", "[]", "[\"applications\", \"tooling\"]", "error")
+    o = o + zone("tooling", "[\"tools/**\"]", "[\"packages\"]", "[\"applications\"]", "warning")
+    return o
+}
+
 // Return template content by name, or "" for an unknown template.
 export func template_by_name(name) {
     if name == "layered" {
@@ -177,10 +210,13 @@ export func template_by_name(name) {
     if name == "feature-sliced" {
         return template_feature_sliced()
     }
+    if name == "monorepo" {
+        return template_monorepo()
+    }
     return ""
 }
 
 // List of available template names (for help/error messages).
 export func template_names() {
-    return "layered, cli, web-app, hexagonal, mvc, feature-sliced"
+    return "layered, cli, web-app, hexagonal, mvc, feature-sliced, monorepo"
 }

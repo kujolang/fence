@@ -113,6 +113,7 @@ func explain_one(zone, imp, res, cfg, zones, zone_names) {
 
     return {
         "import": imp["path"],
+        "line": imp["line"],
         "kind": imp["kind"],
         "status": status,
         "resolved": res["resolved"],
@@ -144,7 +145,7 @@ func explain_human(a) {
     mut i = 0
     while i < n {
         let r = imps[i]
-        o = o + "[" + to_upper(r["decision"]) + "] " + r["import"]
+        o = o + "[" + to_upper(r["decision"]) + "] line " + to_string(r["line"]) + ": " + r["import"]
         if r["resolved"] != "" {
             o = o + " -> " + r["resolved"] + " (" + r["to_zone"] + ")"
         } else {

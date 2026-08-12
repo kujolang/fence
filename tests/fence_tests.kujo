@@ -111,6 +111,7 @@ ok("invalid config has errors", count_errors(validate_config(bad_cfg)) > 0)
 // ---- import extraction ----
 eq("kujo import", extract_for_ext(".kujo", "import math_helpers")[0]["path"], "math_helpers")
 eq("kujo from", extract_for_ext(".kujo", "from metrics import a, b")[0]["path"], "metrics")
+eq("import line number", extract_for_ext(".kujo", "\nfrom metrics import a")[0]["line"], 2)
 eq("py rel", extract_for_ext(".py", "from ..domain import user")[0]["path"], "..domain")
 eq("py grouped import count", len(extract_for_ext(".py", "import os, src.database.users as users")), 2)
 eq("py grouped import second", extract_for_ext(".py", "import os, src.database.users as users")[1]["path"], "src.database.users")
@@ -121,7 +122,10 @@ eq("js import after earlier string", extract_for_ext(".ts", "const label = 'x'; 
 eq("js import after inline block comment", extract_for_ext(".ts", "/* note */ import x from './x'")[0]["path"], "./x")
 eq("rust use", extract_for_ext(".rs", "use crate::domain::User;")[0]["path"], "crate::domain::User")
 eq("rust mod", extract_for_ext(".rs", "pub mod engine;")[0]["kind"], "mod")
+eq("rust grouped use count", len(extract_for_ext(".rs", "use crate::domain::{User, Role};")), 2)
+eq("rust grouped use second", extract_for_ext(".rs", "use crate::domain::{User, Role};")[1]["path"], "crate::domain::Role")
 eq("php use", extract_for_ext(".php", "use App\\Domain\\User;")[0]["path"], "App\\Domain\\User")
+eq("php root namespace", extract_for_ext(".php", "use \\App\\Domain\\User;")[0]["path"], "App\\Domain\\User")
 eq("go block", len(extract_for_ext(".go", "import (\n  \"fmt\"\n  \"myapp/shared\"\n)")), 2)
 eq("go aliased single import", extract_for_ext(".go", "import shared \"myapp/shared\"")[0]["path"], "myapp/shared")
 eq("php dirname require", extract_for_ext(".php", "require_once __DIR__ . '/x.php';")[0]["path"], "./x.php")
@@ -165,7 +169,7 @@ let fake_result = {
     "imports_checked": 4,
     "zone_files": { "ui": 1, "domain": 1, "database": 1 },
     "violations": [
-        { "severity": "error", "from_zone": "ui", "to_zone": "database", "file": "src/ui/Login.tsx", "import": "../database/users", "resolved": "src/database/users.ts", "rule": "r", "message": "m", "suggestion": "s" }
+        { "severity": "error", "from_zone": "ui", "to_zone": "database", "file": "src/ui/Login.tsx", "line": 7, "import": "../database/users", "resolved": "src/database/users.ts", "rule": "r", "message": "m", "suggestion": "s" }
     ]
 }
 let summary = summarize(fake_result, cfg)
@@ -196,6 +200,13 @@ ok("valid ref slash", valid_ref("origin/main"))
 ok("invalid ref inject", valid_ref("evil; rm -rf x") == false)
 ok("invalid ref space", valid_ref("a b") == false)
 ok("invalid ref option", valid_ref("--help") == false)
+ok("invalid ref range", valid_ref("main..feature") == false)
+ok("invalid ref triple range", valid_ref("main...feature") == false)
+ok("invalid ref reflog", valid_ref("main@{1}") == false)
+ok("invalid ref trailing dot", valid_ref("feature.") == false)
+ok("invalid ref trailing slash", valid_ref("feature/") == false)
+ok("invalid ref repeated slash", valid_ref("origin//main") == false)
+ok("valid relative ref", valid_ref("HEAD^"))
 
 // ---- A2: JS comment handling + re-exports ----
 eq("js skips line comment", len(extract_for_ext(".ts", "// import x from \"./c\"\nimport y from \"./r\"")), 1)
@@ -232,6 +243,7 @@ eq("no cycle in layered", len(one_cycle(cfg)), 0)
 eq("hexagonal valid", count_errors(validate_config(normalize_config(parse_toml(template_by_name("hexagonal"))))), 0)
 eq("mvc valid", count_errors(validate_config(normalize_config(parse_toml(template_by_name("mvc"))))), 0)
 eq("feature-sliced valid", count_errors(validate_config(normalize_config(parse_toml(template_by_name("feature-sliced"))))), 0)
+eq("monorepo valid", count_errors(validate_config(normalize_config(parse_toml(template_by_name("monorepo"))))), 0)
 eq("unknown template empty", template_by_name("nope"), "")
 
 // ---- B4/B7: SARIF + schema_version ----
@@ -239,6 +251,7 @@ ok("json schema_version", contains(render_json(fake_result, summary, "fence.toml
 let sarif = render_sarif(fake_result, summary, "fence.toml")
 ok("sarif version", contains(sarif, "2.1.0") == 1)
 ok("sarif rule id", contains(sarif, "fence.boundary-violation") == 1)
+ok("sarif start line", contains(sarif, "startLine") == 1)
 
 // ---- B1: baseline fingerprint + suppression ----
 let viol_one = { "severity": "error", "from_zone": "ui", "to_zone": "database", "file": "src/ui/A.tsx", "import": "../database/users", "resolved": "x", "rule": "r", "message": "m", "suggestion": "s" }

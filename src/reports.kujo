@@ -140,7 +140,7 @@ func human_violations(viols) {
     while i < n {
         let v = viols[i]
         o = o + "[" + to_upper(v["severity"]) + "] " + v["from_zone"] + " -> " + v["to_zone"] + " is not allowed\n"
-        o = o + "  File: " + v["file"] + "\n"
+        o = o + "  File: " + v["file"] + ":" + to_string(dict_get(v, "line", 1)) + "\n"
         o = o + "  Import: " + v["import"] + "\n"
         if v["resolved"] != "" {
             o = o + "  Resolved: " + v["resolved"] + "\n"
@@ -202,7 +202,7 @@ export func render_sarif(result, summary, config_path) {
     let driver = {
         "name": "Fence",
         "version": fence_version(),
-        "informationUri": "https://github.com/",
+        "informationUri": "https://github.com/kujolang/fence",
         "rules": [
             {
                 "id": "fence.boundary-violation",
@@ -237,7 +237,8 @@ func sarif_results(viols) {
             "locations": [
                 {
                     "physicalLocation": {
-                        "artifactLocation": { "uri": v["file"] }
+                        "artifactLocation": { "uri": v["file"] },
+                        "region": { "startLine": dict_get(v, "line", 1) }
                     }
                 }
             ]
@@ -293,7 +294,7 @@ func md_severity_section(viols, severity) {
         let v = viols[i]
         if v["severity"] == severity {
             any = true
-            o = o + "- **" + v["from_zone"] + " -> " + v["to_zone"] + "** in `" + v["file"] + "`\n"
+            o = o + "- **" + v["from_zone"] + " -> " + v["to_zone"] + "** in `" + v["file"] + ":" + to_string(dict_get(v, "line", 1)) + "`\n"
             o = o + "  - Import: `" + v["import"] + "`"
             if v["resolved"] != "" {
                 o = o + " (resolves to `" + v["resolved"] + "`)"
@@ -333,7 +334,7 @@ func md_fixes(viols) {
     mut i = 0
     while i < n {
         let v = viols[i]
-        o = o + to_string(i + 1) + ". `" + v["file"] + "`: " + v["suggestion"] + "\n"
+        o = o + to_string(i + 1) + ". `" + v["file"] + ":" + to_string(dict_get(v, "line", 1)) + "`: " + v["suggestion"] + "\n"
         i = i + 1
     }
     o = o + "\n"
@@ -355,7 +356,7 @@ func md_handoff(summary, viols) {
         let v = viols[i]
         if v["severity"] == "error" {
             shown = shown + 1
-            o = o + to_string(shown) + ". `" + v["file"] + "` depends on " + v["to_zone"] + " (" + v["suggestion"] + ")\n"
+            o = o + to_string(shown) + ". `" + v["file"] + ":" + to_string(dict_get(v, "line", 1)) + "` depends on " + v["to_zone"] + " (" + v["suggestion"] + ")\n"
         }
         i = i + 1
     }

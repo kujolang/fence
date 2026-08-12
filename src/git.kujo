@@ -44,6 +44,12 @@ export func valid_ref(ref) {
     if starts_with(ref, "-") {
         return false
     }
+    if contains(ref, "..") == 1 || contains(ref, "//") == 1 || contains(ref, "@{") == 1 {
+        return false
+    }
+    if ends_with(ref, ".") || ends_with(ref, "/") || ends_with(ref, ".lock") {
+        return false
+    }
     return regex_match(ref, "^[A-Za-z0-9._/~^-]+$")
 }
 
@@ -60,7 +66,7 @@ export func changed_files(base) {
     // Tracked changes vs base, plus staged/unstaged changes, plus untracked.
     let diff = execute_status("git diff --name-only " + base)
     if diff.success == false {
-        return mk_err("git diff failed for base " + base, 4)
+        return mk_err("git diff failed for base " + base + ". Verify the ref exists locally; in a shallow CI checkout, fetch the base branch with sufficient history before running Fence.", 4)
     }
     let untracked = execute_status("git ls-files --others --exclude-standard")
 

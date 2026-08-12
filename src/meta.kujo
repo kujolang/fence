@@ -41,7 +41,7 @@ export func help_text() {
         "  --help               Show this help",
         "",
         "init options:",
-        "  --template <name>    layered (default), cli, web-app, hexagonal, mvc, feature-sliced",
+        "  --template <name>    layered (default), cli, web-app, hexagonal, mvc, feature-sliced, monorepo",
         "  --force              Overwrite an existing fence.toml",
         "",
         "check options:",
