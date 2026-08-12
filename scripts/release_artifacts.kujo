@@ -1,0 +1,47 @@
+// Generate deterministic checksums, an SPDX-shaped SBOM, and SLSA-shaped
+// provenance for the Kujo source distribution. Signing remains a publisher
+// responsibility so private keys never enter Fence.
+
+mut output = "dist/release"
+let argv = args()
+if len(argv) == 2 && argv[0] == "--output" { output = argv[1] }
+if len(argv) != 0 && len(argv) != 2 {
+    print("Usage: kujo run scripts/release_artifacts.kujo -- [--output DIR]")
+    exit(2)
+}
+
+if path_is_dir(output) == false { create_dir(output) }
+mut files = ["fence.kujo", "fence.sh", "README.md", "LICENSE"]
+let src_names = sort(list_dir("src"))
+mut i = 0
+while i < len(src_names) {
+    if ends_with(src_names[i], ".kujo") { files = push(files, "src/" + src_names[i]) }
+    i = i + 1
+}
+files = sort(files)
+
+mut checksums = ""
+mut components = []
+mut j = 0
+mut file_digest = ""
+while j < len(files) {
+    file_digest = sha256_file(files[j])
+    checksums = checksums + file_digest + "  " + files[j] + "\n"
+    components = push(components, { "type": "file", "name": files[j], "hashes": [{ "alg": "SHA-256", "content": file_digest }] })
+    j = j + 1
+}
+
+let sbom = { "spdxVersion": "SPDX-2.3", "name": "fence-source", "dataLicense": "CC0-1.0", "files": components }
+let provenance = {
+    "_type": "https://in-toto.io/Statement/v1",
+    "subject": [{ "name": "fence-source", "digest": { "sha256": sha256(checksums) } }],
+    "predicateType": "https://slsa.dev/provenance/v1",
+    "predicate": {
+        "buildDefinition": { "buildType": "https://github.com/kujolang/fence/release/v1", "externalParameters": {} },
+        "runDetails": { "builder": { "id": "local-kujo" } }
+    }
+}
+write_file(output + "/SHA256SUMS", checksums, true)
+write_file(output + "/sbom.spdx.json", to_json_pretty(sbom), true)
+write_file(output + "/provenance.intoto.json", to_json_pretty(provenance), true)
+print("Wrote deterministic release integrity artifacts to " + output)

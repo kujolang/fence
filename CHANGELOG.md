@@ -6,6 +6,20 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Enterprise hardening
+- Added opt-in output-root confinement and file/import/UTF-8 report resource
+  limits with deterministic runtime failures.
+- Added unreadable-source diagnostics across human, JSON, Markdown, and SARIF.
+- Added reasoned, expiring structured ignores that remain visible in reports.
+- Added manifest-backed `workspace init`, observed-edge graph comparison, and
+  safe `baseline prune` maintenance.
+- Added JavaScript/TypeScript multiline imports, nested Rust groups, grouped PHP
+  namespaces, and Go module-prefix resolution.
+- Added versioned JSON/SARIF fixtures and passing/failing CLI, web-app, and
+  monorepo examples.
+- Added a Kujo-native scale harness with 1,600- and 10,000-file evidence.
+- Added deterministic checksum, SPDX SBOM, and in-toto/SLSA provenance generation.
+
 ### Fixed
 - Reject invalid `--fail-on` overrides and malformed baseline schemas instead
   of silently passing or misapplying them.

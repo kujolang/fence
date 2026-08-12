@@ -75,6 +75,7 @@ kujo run fence.kujo -- graph --format mermaid
 kujo run fence.kujo -- graph --format dot --output architecture.dot
 kujo run fence.kujo -- graph --format json
 kujo run fence.kujo -- graph --cycles          # report dependency cycles
+kujo run fence.kujo -- graph --observed --format json
 ```
 
 | Flag | Meaning |
@@ -82,8 +83,9 @@ kujo run fence.kujo -- graph --cycles          # report dependency cycles
 | `--format <fmt>` | `human` (default), `json`, `dot`, `mermaid` |
 | `--output <path>` | Write the graph to a repo-relative file |
 | `--cycles` | Report dependency cycles in allowed edges (exit `1` if any) |
+| `--observed` | Compare configured and observed internal edges (`human`/`json`) |
 
-## `baseline create`
+## `baseline create` / `baseline prune`
 
 Record current violations so an existing repo can adopt Fence gradually.
 
@@ -93,6 +95,15 @@ kujo run fence.kujo -- baseline create     # writes fence-baseline.json
 
 Then run `check --baseline` to suppress those exact violations; any **new**
 violation still fails. Commit `fence-baseline.json` and shrink it over time.
+
+`kujo run fence.kujo -- baseline prune` removes fingerprints no longer present
+in a full current scan and prints removed/remaining counts.
+
+## `workspace init`
+
+`kujo run fence.kujo -- workspace init` discovers direct children of `apps/`
+and `packages/` with common local manifests and generates one deterministic zone
+per package. It refuses to overwrite an existing `fence.toml`.
 
 ## `validate`
 

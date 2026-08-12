@@ -28,7 +28,9 @@ warn on values they do not recognize.
     "imports_checked": 213,
     "violations": 3,
     "errors": 3,
-    "warnings": 1
+    "warnings": 1,
+    "skipped_files": 0,
+    "ignored_violations": 0
   },
   "config": { "path": "fence.toml" },
   "zones": [
@@ -47,7 +49,9 @@ warn on values they do not recognize.
       "message": "ui cannot depend on database",
       "suggestion": "Move database access behind a domain or service code."
     }
-  ]
+  ],
+  "skipped_files": [],
+  "ignored_violations": []
 }
 ```
 
@@ -61,6 +65,8 @@ warn on values they do not recognize.
 | `violations` | int | Total violations (all severities). |
 | `errors` | int | Count of `error`-severity violations. |
 | `warnings` | int | Count of `warning`-severity violations. |
+| `skipped_files` | int | Source files Fence could not read. |
+| `ignored_violations` | int | Findings suppressed by active structured exceptions. |
 
 ### `zones[]` (array of objects)
 | Key | Type | Notes |
@@ -84,10 +90,17 @@ warn on values they do not recognize.
 | `message` | string | Human-readable summary. |
 | `suggestion` | string | Deterministic fix suggestion. |
 
+### Diagnostic arrays
+
+`skipped_files[]` contains `{file, reason}` without source content.
+`ignored_violations[]` contains `{file, line, import, reason, expires}` so policy
+debt remains auditable.
+
 ## Stability guarantees
 
 - No timestamps or environment-derived values are included.
-- The same repository state always produces byte-identical output.
+- The same repository state and effective dated-exception policy produce
+  byte-identical output.
 - New optional fields may be added under the same `schema_version`; consumers
   should ignore unknown fields. Removing or renaming a field bumps
   `schema_version`.

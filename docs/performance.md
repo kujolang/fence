@@ -42,6 +42,27 @@ with `files × imports`, i.e. ~40–55 ms per file on this machine.
   files and resolved targets.
 - Both caches are process-local, deterministic, and discarded after each check.
 
+## Kujo-native benchmark harness
+
+Run the checked-in generator and benchmark without Python:
+
+```bash
+kujo run benchmarks/fence_benchmark.kujo -- --files 1600
+kujo run benchmarks/fence_benchmark.kujo -- --files 10000
+```
+
+Measured on the August 12, 2026 development machine after cache and walk
+fast-path hardening:
+
+| Requested files | Walk | Analyze | Total scan | Resolution hits/misses | Zone hits/misses |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1,600 | 10.8 s | 30.1 s | 40.8 s | 1,599 / 1 | 1,600 / 1,601 |
+| 10,000 | 155.0 s | 292.3 s | 447.3 s | 9,999 / 1 | 10,000 / 10,001 |
+
+The harness adds one shared target file, so `files_scanned` is requested files
+plus one. Timings are comparative developer-machine evidence, not a universal
+service-level guarantee. Both runs completed without stack overflow or failure.
+
 ## Notes for optimizers
 
 If a future change targets throughput (see `docs/ENHANCEMENTS.md`):

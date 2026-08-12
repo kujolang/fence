@@ -91,6 +91,8 @@ kujo run /path/to/fence/fence.kujo -- check
 | `explain <path>` | Show how Fence classifies one file and each of its imports |
 | `graph` | Print the architecture dependency graph (human/json/dot/mermaid, `--cycles`) |
 | `baseline create` | Record current violations so legacy repos can adopt Fence gradually |
+| `baseline prune` | Remove stale baseline fingerprints after fixes |
+| `workspace init` | Generate per-package zones from local manifests |
 | `validate` | Validate `fence.toml` (incl. overlap & cycle warnings) |
 | `doctor` | Print environment diagnostics |
 | `help` / `--help` | Usage text |
@@ -114,8 +116,10 @@ Templates: `layered` (default), `cli`, `web-app`, `hexagonal`, `mvc`,
 | [Performance](docs/performance.md) | Measured numbers and scaling guidance |
 | [FAQ](docs/faq.md) · [Troubleshooting](docs/troubleshooting.md) | Common questions and fixes |
 | [Release checklist](docs/release.md) | Repeatable validation and release gates |
+| [Packaging](docs/packaging.md) | Reproducible installs and integrity artifacts |
+| [Examples](examples/README.md) | Passing and failing CLI, web-app, and monorepo fixtures |
 | [Completed v1 checklist](docs/ENHANCEMENTS.md) | Prior hardening work already completed |
-| [Next enhancements](docs/NEXT_ENHANCEMENTS_2026-08-12.md) | Next-session roadmap |
+| [Next enhancements](docs/NEXT_ENHANCEMENTS_2026-08-12_SESSION_2.md) | Next-session roadmap |
 
 ## Example output
 
@@ -185,7 +189,10 @@ plus `.git`, parent-traversal, absolute-path, and symlink-escape guards). See
 ```
 fence.kujo              entry point (args -> dispatch -> exit code)
 src/*.kujo              implementation modules (see docs/architecture.md)
-tests/fence_tests.kujo  run-mode test harness (136 assertions)
+tests/fence_tests.kujo  run-mode test harness (155 assertions)
+benchmarks/             Kujo-native 1,600/10,000-file scale harness
+examples/               passing and deliberately failing example repos
+scripts/                deterministic release-integrity generation
 docs/                   documentation
 agent/                  ignored archive of implementation prompts and handoffs
 ```

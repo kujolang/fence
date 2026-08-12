@@ -1,7 +1,7 @@
 # Fence Next Enhancement Checklist
 
 > Historical review backlog. The August 2026 review completed or refined many
-> of these items; use [the current checklist](NEXT_ENHANCEMENTS_2026-08-12.md)
+> of these items; use [the current checklist](NEXT_ENHANCEMENTS_2026-08-12_SESSION_2.md)
 > for future work.
 
 This is the next-session backlog after the June 19, 2026 hardening review. The

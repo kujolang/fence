@@ -20,6 +20,14 @@ Run from a clean branch with `kujo` on `PATH`.
   ```
 
 - [ ] Run the scratch-repository flow in [the demo](demo.md).
+- [ ] Generate and verify deterministic release integrity artifacts:
+
+  ```bash
+  kujo run scripts/release_artifacts.kujo -- --output dist/release
+  ```
+
+- [ ] Sign `SHA256SUMS`, the SBOM, and provenance with the approved external
+      signing service; Fence does not manage private keys.
 - [ ] Verify `git status --short` is empty after committing release artifacts.
 - [ ] Tag the verified commit and push the branch and tag through the normal
       protected-branch workflow.

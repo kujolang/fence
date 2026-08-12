@@ -12,6 +12,13 @@ source_roots = ["src"]
 default_severity = "error"
 fail_on = "error"
 unknown_dependency_policy = "warn"
+output_roots = ["reports", ".fence"]
+go_module = "github.com/acme/product"
+
+[limits]
+max_files = 10000
+max_imports = 50000
+max_report_bytes = 10485760
 
 [scan]
 include = [
@@ -35,6 +42,14 @@ can_depend_on = ["domain", "shared"]
 cannot_depend_on = ["database", "infra"]
 severity = "error"
 
+[[ignores]]
+from_zone = "ui"
+to_zone = "database"
+file = "src/ui/legacy/**"
+import = "../database/users"
+reason = "Migration tracked in ARCH-123"
+expires = "2026-12-31"
+
 [zones.domain]
 paths = ["src/domain/**", "src/core/**"]
 can_depend_on = ["shared"]
@@ -51,6 +66,26 @@ severity = "error"
 | `default_severity` | string | `"error"` | Fallback severity for zones without one. |
 | `fail_on` | string | `"error"` | Threshold that fails the command: `none`/`warning`/`error`. |
 | `unknown_dependency_policy` | string | `"warn"` | What to do with unmappable targets: `allow`/`warn`/`deny`. |
+| `output_roots` | string[] | `[]` | Optional repo-relative directories allowed for `--output`. |
+| `go_module` | string | `""` | Go module prefix used to resolve module-qualified internal imports. |
+
+## `[limits]`
+
+All limits default to `0` (unlimited). Exceeding one fails with runtime exit `4`
+before a report is written.
+
+| Key | Meaning |
+| --- | --- |
+| `max_files` | Maximum source files selected for one check. |
+| `max_imports` | Maximum imports analyzed. |
+| `max_report_bytes` | Maximum UTF-8 bytes in the rendered report. |
+
+## `[[ignores]]`
+
+Structured exceptions match `from_zone`, `to_zone`, `file` glob, and exact
+`import`; omitted match fields default to `*`. Every exception requires a
+non-empty `reason` and ISO `expires` date. Expired entries are inactive. Ignored
+violations remain visible in JSON and summary counts.
 
 ## `[scan]`
 

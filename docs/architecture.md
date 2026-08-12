@@ -1,6 +1,6 @@
 # Architecture
 
-Fence is implemented entirely in Kujo: an entry point (`fence.kujo`) plus 29
+Fence is implemented entirely in Kujo: an entry point (`fence.kujo`) plus 31
 focused modules under `src/`. Functions are kept small and call chains shallow
 because the Kujo VM has a limited call stack.
 
@@ -32,6 +32,9 @@ command modules. Analysis maintains per-run import-resolution and zone-match
 caches; both are discarded at process exit and cannot affect deterministic
 output.
 
+`graph --observed` reuses the pipeline to compare configured allowed edges with
+cross-zone internal edges actually found. Same-zone edges are omitted.
+
 ## Module map
 
 | Module | Responsibility |
@@ -48,6 +51,7 @@ output.
 | `cmd_baseline.kujo` | `baseline create` |
 | `cmd_validate.kujo` | `validate` |
 | `cmd_doctor.kujo` | `doctor` |
+| `cmd_workspace.kujo` | `workspace init` manifest discovery. |
 | **Config** | |
 | `config.kujo` | Load + normalize `fence.toml` / `fence.json`. |
 | `validate.kujo` | Structural validation, overlap + cycle warnings. |
@@ -60,6 +64,7 @@ output.
 | `resolve.kujo` | Import resolution (internal/external/unknown). |
 | `zones.kujo` | File → zone mapping. |
 | `rules.kujo` | Dependency rule engine + external rules + suggestions. |
+| `ignores.kujo` | Reasoned, expiring structured exceptions. |
 | `cycles.kujo` | Dependency-cycle detection (Kahn's algorithm). |
 | `analyze.kujo` | The walk→…→violations orchestration. |
 | **Output** | |
@@ -75,7 +80,7 @@ output.
 ## Adding a language extractor
 
 1. Add `extract_<lang>(content)` returning records
-   `{ kind, path, raw }` (see existing extractors in `imports.kujo` /
+   `{ kind, path, raw, line }` (see existing extractors in `imports.kujo` /
    `imports_ext.kujo`). Scan line-by-line; keep it best-effort.
 2. Register the file extension(s) in `extract_for_ext` (`imports.kujo`).
 3. If the import syntax needs new resolution behavior, extend

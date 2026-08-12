@@ -17,6 +17,12 @@ Fence is local-first and minimizes its trust surface by design:
   tree is rejected via canonical-ancestor resolution.
 - **No secret exposure.** Fence does not print file contents (only import lines
   and paths) and does not read or log environment secrets.
+- **Optional output confinement.** Enterprises can restrict `--output` to
+  configured repo-relative `output_roots`.
+- **Resource ceilings.** Optional file, import, and UTF-8 report-byte limits
+  bound work on hostile or accidentally huge repositories.
+- **Auditable exceptions.** Structured ignores require a reason and expiry and
+  remain visible in machine reports.
 
 ## Supported versions
 

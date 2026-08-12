@@ -14,8 +14,9 @@ Start at the [project README](../README.md) for the overview, then dive into:
 - **[FAQ](faq.md)** — common questions.
 - **[Troubleshooting](troubleshooting.md)** — fixes for common issues.
 - **[Release checklist](release.md)** — deterministic release gates.
+- **[Packaging](packaging.md)** — vendoring, centralized installs, checksums, SBOM, and provenance.
 - **[Enhancements backlog](ENHANCEMENTS.md)** — completed v1 hardening checklist.
-- **[Next enhancements](NEXT_ENHANCEMENTS_2026-08-12.md)** — next-session review backlog.
+- **[Next enhancements](NEXT_ENHANCEMENTS_2026-08-12_SESSION_2.md)** — next-session review backlog.
 
 Canonical examples are in `README.md` and the command-focused docs above.
 `agent/**` and `tests/fixtures/**` are implementation history or validation
