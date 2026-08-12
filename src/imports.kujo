@@ -147,6 +147,8 @@ export func extract_javascript(content) {
     let n = len(lines)
     mut out = []
     mut in_comment = false
+    mut pending = ""
+    mut pending_line = 0
     mut i = 0
     while i < n {
         let line = clean_line(lines[i])
@@ -172,7 +174,21 @@ export func extract_javascript(content) {
                 }
             } else {
                 if is_line_comment(line) == false {
-                    out = js_scan_line(out, line, i + 1)
+                    if pending != "" {
+                        pending = pending + " " + line
+                        if first_quoted(pending) != "" {
+                            out = js_scan_line(out, pending, pending_line)
+                            pending = ""
+                            pending_line = 0
+                        }
+                    } else {
+                        if regex_match(line, "^(import|export)\\b") && first_quoted(line) == "" {
+                            pending = line
+                            pending_line = i + 1
+                        } else {
+                            out = js_scan_line(out, line, i + 1)
+                        }
+                    }
                 }
             }
         }
@@ -239,13 +255,17 @@ func quoted_after(line, keyword) {
 // An unreadable file (permissions, race) is skipped rather than aborting the
 // whole scan.
 export func detect_imports(file_path) {
+    return detect_imports_result(file_path)["imports"]
+}
+
+export func detect_imports_result(file_path) {
     mut content = ""
     try {
         content = read_file(file_path)
     } except e {
-        return []
+        return { "ok": false, "imports": [], "error": "unreadable source file", "file": file_path }
     }
-    return extract_for_ext(file_ext(file_path), content)
+    return { "ok": true, "imports": extract_for_ext(file_ext(file_path), content), "error": "", "file": file_path }
 }
 
 // Separated so it can be unit-tested without touching the filesystem.

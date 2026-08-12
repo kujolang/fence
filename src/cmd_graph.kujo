@@ -2,11 +2,13 @@
 // Implements `fence graph`.
 
 from src.config import load_config
-from src.graph import render_graph
+from src.graph import render_graph, render_observed_graph
 from src.cliargs import flag_or, has_flag
-from src.output import write_safe
+from src.output import write_safe_under
 from src.cycles import one_cycle
 from src.util import join_strings
+from src.walk import walk
+from src.analyze import analyze_files
 
 export func cmd_graph(parsed) {
     let flags = parsed["flags"]
@@ -34,7 +36,12 @@ export func cmd_graph(parsed) {
     }
 
     let format = flag_or(flags, "format", "human")
-    let g = render_graph(cfg, format)
+    mut g = render_graph(cfg, format)
+    if has_flag(flags, "observed") {
+        let observed_files = walk(cfg["source_roots"], cfg["include"], cfg["exclude"])
+        let observed_result = analyze_files(observed_files, cfg)
+        g = render_observed_graph(cfg, observed_result["observed_edges"], format)
+    }
     if g["ok"] == false {
         print("Error: " + g["text"])
         return 2
@@ -42,7 +49,7 @@ export func cmd_graph(parsed) {
 
     let output_path = flag_or(flags, "output", "")
     if output_path != "" {
-        let w = write_safe(output_path, g["text"], true)
+        let w = write_safe_under(output_path, g["text"], true, cfg["output_roots"])
         if w["ok"] == false {
             print("Error: " + w["error"])
             return 5

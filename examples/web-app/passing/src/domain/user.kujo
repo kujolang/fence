@@ -1,0 +1,1 @@
+export func user_name() { return "Ada" }

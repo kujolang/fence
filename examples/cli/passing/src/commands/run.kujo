@@ -1,0 +1,2 @@
+from src.core.service import execute
+export func run() { return execute() }

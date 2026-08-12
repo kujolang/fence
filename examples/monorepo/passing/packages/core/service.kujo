@@ -1,0 +1,1 @@
+export func service_name() { return "core" }

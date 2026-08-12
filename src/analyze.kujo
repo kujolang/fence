@@ -4,19 +4,20 @@
 // Loop variables here use unique names (fi/fc, mi/mc) so that callee helpers
 // (which use plain i/n internally) cannot alias and corrupt the loop counters.
 
-from src.imports import detect_imports
-from src.resolve import resolve_import
+from src.imports import detect_imports_result
+from src.resolve import resolve_import_with_go
 from src.zones import match_zone
 from src.rules import check_dependency, make_violation, check_external, make_external_violation
-from src.util import dict_get, dict_has
+from src.util import dict_get, dict_has, arr_has
 from src.paths import file_ext
+from src.ignores import ignore_match
 
 // Analyze a list of files against the config. Returns:
 //   {
 //     files_scanned, imports_checked,
 //     violations: [...],
 //     zone_files: { zone: count },
-//     ambiguous: [ { file, zones } ]
+//     metrics: { resolution_cache_hits/misses, zone_cache_hits/misses }
 //   }
 export func analyze_files(files, cfg) {
     let zones = cfg["zones"]
@@ -26,18 +27,36 @@ export func analyze_files(files, cfg) {
 
     mut violations = []
     mut zone_files = {}
+    mut skipped_files = []
+    mut observed_edges = []
+    mut ignored_violations = []
     mut imports_checked = 0
     mut zone_cache = {}
     mut resolution_cache = {}
+    mut resolution_hits = 0
+    mut resolution_misses = 0
+    mut zone_hits = 0
+    mut zone_misses = 0
 
     let fc = len(files)
     mut fi = 0
     while fi < fc {
         let file = files[fi]
-        let file_zone = cached_zone(file, zones, zone_names, zone_cache)
+        let file_zone_result = cached_zone_result(file, zones, zone_names, zone_cache)
+        let file_zone = file_zone_result["zone"]
+        zone_cache = file_zone_result["cache"]
+        if file_zone_result["hit"] {
+            zone_hits = zone_hits + 1
+        } else {
+            zone_misses = zone_misses + 1
+        }
         zone_files = bump(zone_files, file_zone)
 
-        let imps = detect_imports(file)
+        let detected = detect_imports_result(file)
+        let imps = detected["imports"]
+        if detected["ok"] == false {
+            skipped_files = push(skipped_files, { "file": file, "reason": detected["error"] })
+        }
         let mc = len(imps)
         mut mi = 0
         while mi < mc {
@@ -49,17 +68,37 @@ export func analyze_files(files, cfg) {
                 mut res = {}
                 if dict_has(resolution_cache, cache_key) {
                     res = resolution_cache[cache_key]
+                    resolution_hits = resolution_hits + 1
                 } else {
-                    res = resolve_import(imp["path"], file, roots, aliases)
+                    res = resolve_import_with_go(imp["path"], file, roots, aliases, cfg["go_module"])
                     resolution_cache[cache_key] = res
+                    resolution_misses = resolution_misses + 1
                 }
                 mut to_zone = "unknown"
                 if res["status"] == "internal" {
-                    to_zone = cached_zone(res["resolved"], zones, zone_names, zone_cache)
+                    let target_zone_result = cached_zone_result(res["resolved"], zones, zone_names, zone_cache)
+                    to_zone = target_zone_result["zone"]
+                    zone_cache = target_zone_result["cache"]
+                    if target_zone_result["hit"] {
+                        zone_hits = zone_hits + 1
+                    } else {
+                        zone_misses = zone_misses + 1
+                    }
+                    if file_zone != to_zone {
+                        let edge_key = file_zone + "|" + to_zone
+                        if arr_has(observed_edges, edge_key) == false {
+                            observed_edges = push(observed_edges, edge_key)
+                        }
+                    }
                 }
                 let v = judge(file, file_zone, imp, res, to_zone, cfg)
                 if dict_has(v, "severity") {
-                    violations = push(violations, v)
+                    let ignored = ignore_match(v, cfg["ignores"])
+                    if ignored["ignored"] {
+                        ignored_violations = push(ignored_violations, { "file": v["file"], "line": v["line"], "import": v["import"], "reason": ignored["reason"], "expires": ignored["expires"] })
+                    } else {
+                        violations = push(violations, v)
+                    }
                 }
             }
             mi = mi + 1
@@ -71,7 +110,16 @@ export func analyze_files(files, cfg) {
         "files_scanned": fc,
         "imports_checked": imports_checked,
         "violations": violations,
-        "zone_files": zone_files
+        "zone_files": zone_files,
+        "skipped_files": skipped_files,
+        "observed_edges": observed_edges,
+        "ignored_violations": ignored_violations,
+        "metrics": {
+            "resolution_cache_hits": resolution_hits,
+            "resolution_cache_misses": resolution_misses,
+            "zone_cache_hits": zone_hits,
+            "zone_cache_misses": zone_misses
+        }
     }
 }
 
@@ -106,13 +154,13 @@ func resolution_key(raw, file) {
     return raw
 }
 
-func cached_zone(path, zones, zone_names, cache) {
+func cached_zone_result(path, zones, zone_names, cache) {
     if dict_has(cache, path) {
-        return cache[path]
+        return { "zone": cache[path], "hit": true, "cache": cache }
     }
     let matched = match_zone(path, zones, zone_names)
     cache[path] = matched
-    return matched
+    return { "zone": matched, "hit": false, "cache": cache }
 }
 
 // Increment a per-zone file counter.

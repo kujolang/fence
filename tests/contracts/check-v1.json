@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "version": "1.0.0",
+  "status": "failed",
+  "summary": {
+    "files_scanned": 1,
+    "imports_checked": 1,
+    "violations": 1,
+    "errors": 1,
+    "warnings": 0,
+    "skipped_files": 0,
+    "ignored_violations": 0
+  },
+  "config": { "path": "fence.toml" },
+  "zones": [],
+  "violations": [{
+    "severity": "error",
+    "from_zone": "ui",
+    "to_zone": "database",
+    "file": "src/ui/Login.ts",
+    "line": 1,
+    "import": "../database/users",
+    "resolved": "src/database/users.ts",
+    "rule": "zones.ui.cannot_depend_on includes database",
+    "message": "ui cannot depend on database",
+    "suggestion": "Move database access behind a domain or service boundary."
+  }],
+  "skipped_files": [],
+  "ignored_violations": []
+}

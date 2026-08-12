@@ -12,11 +12,11 @@
 
 from src.glob import glob_match, glob_match_any
 from src.paths import is_safe_output, file_ext, parent_dir, base_name
-from src.util import arr_has, sort_strings, join_strings, truthy
+from src.util import arr_has, sort_strings, join_strings, truthy, utf8_byte_length
 from src.config import normalize_config
 from src.validate import validate_config, count_errors
-from src.imports import extract_for_ext
-from src.resolve import resolve_import
+from src.imports import extract_for_ext, detect_imports_result
+from src.resolve import resolve_import, resolve_import_with_go
 from src.zones import match_zone
 from src.rules import check_dependency, suggest
 from src.reports import summarize, render_json, render_sarif
@@ -26,12 +26,16 @@ from src.git import valid_ref
 from src.cycles import one_cycle, cycle_nodes
 from src.templates import template_by_name
 from src.analyze import analyze_files
-from src.baseline import fingerprint, baseline_from_result, apply_baseline
+from src.baseline import fingerprint, baseline_from_result, apply_baseline, prune_baseline
 from src.rules import check_external
 from src.reports import render_human, render_markdown
 from src.graph import render_graph_json, render_graph_dot, render_graph_human
 from src.walk import walk
 from src.meta import no_config_text
+from src.output import output_root_allowed
+from src.walk import include_extensions
+from src.graph import render_observed_graph
+from src.ignores import ignore_match
 
 mut g_pass = 0
 mut g_fail = 0
@@ -126,6 +130,9 @@ eq("rust grouped use count", len(extract_for_ext(".rs", "use crate::domain::{Use
 eq("rust grouped use second", extract_for_ext(".rs", "use crate::domain::{User, Role};")[1]["path"], "crate::domain::Role")
 eq("php use", extract_for_ext(".php", "use App\\Domain\\User;")[0]["path"], "App\\Domain\\User")
 eq("php root namespace", extract_for_ext(".php", "use \\App\\Domain\\User;")[0]["path"], "App\\Domain\\User")
+eq("js multiline import", extract_for_ext(".ts", "import {\n  user\n} from './user'")[0]["path"], "./user")
+eq("rust nested group count", len(extract_for_ext(".rs", "use crate::{domain::{User, Role}, shared::Id};")), 3)
+eq("php grouped use count", len(extract_for_ext(".php", "use App\\Domain\\{User, Role};")), 2)
 eq("go block", len(extract_for_ext(".go", "import (\n  \"fmt\"\n  \"myapp/shared\"\n)")), 2)
 eq("go aliased single import", extract_for_ext(".go", "import shared \"myapp/shared\"")[0]["path"], "myapp/shared")
 eq("php dirname require", extract_for_ext(".php", "require_once __DIR__ . '/x.php';")[0]["path"], "./x.php")
@@ -151,6 +158,7 @@ let rust_nested = "tests/fixtures/sample/src/rust/parent/nested/mod.rs"
 eq("resolve rust super module", resolve_import("super::sibling", rust_nested, roots, aliases)["resolved"], "tests/fixtures/sample/src/rust/parent/sibling.rs")
 let longest_aliases = { "@": "tests/fixtures/sample/src", "@/data": "tests/fixtures/sample/src/database" }
 eq("resolve longest alias prefix", resolve_import("@/data/users", "tests/fixtures/sample/src/ui/Login.tsx", roots, longest_aliases)["resolved"], "tests/fixtures/sample/src/database/users.ts")
+eq("resolve go module prefix", resolve_import_with_go("github.com/acme/app/shared/util", "tests/fixtures/sample/src/main.go", roots, aliases, "github.com/acme/app")["resolved"], "tests/fixtures/sample/src/shared/util.ts")
 
 // ---- zones + rules ----
 let zones = cfg["zones"]
@@ -208,6 +216,18 @@ ok("invalid ref trailing slash", valid_ref("feature/") == false)
 ok("invalid ref repeated slash", valid_ref("origin//main") == false)
 ok("valid relative ref", valid_ref("HEAD^"))
 
+// ---- enterprise policy controls ----
+ok("output root allows child", output_root_allowed("reports/fence.json", ["reports"]))
+ok("output root rejects sibling", output_root_allowed("fence.json", ["reports"]) == false)
+eq("include extension fast path", to_json(include_extensions(["src/**/*.ts", "src/**/*.py"])), to_json([".ts", ".py"]))
+eq("include extension fallback", len(include_extensions(["src/**"])), 0)
+let ignored = ignore_match(fake_result["violations"][0], [{ "from_zone": "ui", "to_zone": "database", "file": "src/ui/**", "import": "*", "reason": "migration", "expires": "2999-01-01" }])
+ok("structured ignore match", ignored["ignored"])
+let expired_ignore = ignore_match(fake_result["violations"][0], [{ "reason": "old", "expires": "2000-01-01" }])
+ok("expired ignore inactive", expired_ignore["ignored"] == false)
+ok("unreadable file diagnostic", detect_imports_result("tests/fixtures/missing.ts")["ok"] == false)
+eq("utf8 byte limit accounting", utf8_byte_length("犬"), 3)
+
 // ---- A2: JS comment handling + re-exports ----
 eq("js skips line comment", len(extract_for_ext(".ts", "// import x from \"./c\"\nimport y from \"./r\"")), 1)
 eq("js skips block comment", len(extract_for_ext(".ts", "/* import a from \"./a\" */")), 0)
@@ -252,6 +272,11 @@ let sarif = render_sarif(fake_result, summary, "fence.toml")
 ok("sarif version", contains(sarif, "2.1.0") == 1)
 ok("sarif rule id", contains(sarif, "fence.boundary-violation") == 1)
 ok("sarif start line", contains(sarif, "startLine") == 1)
+let check_contract = parse_json(read_file("tests/contracts/check-v1.json"))
+eq("contract fixture schema", check_contract["schema_version"], 1)
+ok("contract fixture violation line", check_contract["violations"][0]["line"] > 0)
+let sarif_contract = parse_json(read_file("tests/contracts/sarif-v2.1.0.json"))
+eq("sarif fixture version", sarif_contract["version"], "2.1.0")
 
 // ---- B1: baseline fingerprint + suppression ----
 let viol_one = { "severity": "error", "from_zone": "ui", "to_zone": "database", "file": "src/ui/A.tsx", "import": "../database/users", "resolved": "x", "rule": "r", "message": "m", "suggestion": "s" }
@@ -264,6 +289,14 @@ eq("baseline suppresses", applied["suppressed"], 1)
 eq("baseline kept empty", len(applied["result"]["violations"]), 0)
 let applied_none = apply_baseline(bl_result, [])
 eq("baseline keeps new", len(applied_none["result"]["violations"]), 1)
+let pruned = prune_baseline(bl_result, [fingerprint(viol_one), "stale|fingerprint"])
+eq("baseline prune removes stale", len(pruned["removed"]), 1)
+eq("baseline prune keeps current", pruned["kept"], 1)
+
+// ---- observed graph ----
+let observed_json = render_observed_graph(cfg, ["ui|domain", "domain|database"], "json")["text"]
+ok("observed graph configured edge", contains(observed_json, "ui|domain") == 1)
+ok("observed graph unconfigured edge", contains(observed_json, "domain|database") == 1)
 
 // ---- D1: renderer golden checks ----
 let human = render_human(fake_result, summary, "fence.toml")

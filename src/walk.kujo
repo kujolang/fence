@@ -6,7 +6,8 @@
 // function is called from within a loop body. Only builtins run in the hot loop.
 
 from src.glob import glob_match_any
-from src.util import sort_strings
+from src.util import sort_strings, arr_has
+from src.paths import file_ext
 
 // Collect repo-relative file paths under `source_roots` that match an include
 // pattern and no exclude pattern. `.git` is always skipped.
@@ -65,11 +66,20 @@ export func walk(source_roots, include_patterns, exclude_patterns) {
 // Apply include/exclude filtering to a flat file list.
 func filter_files(files, include_patterns, exclude_patterns) {
     mut out = []
+    let fast_exts = include_extensions(include_patterns)
     let n = len(files)
     mut i = 0
     while i < n {
         let f = files[i]
-        let included = is_included(f, include_patterns)
+        mut included = true
+        if len(fast_exts) > 0 {
+            if arr_has(fast_exts, file_ext(f)) == false {
+                included = false
+            }
+        }
+        if included {
+            included = is_included(f, include_patterns)
+        }
         if included {
             if glob_match_any(exclude_patterns, f) {
                 // excluded
@@ -80,6 +90,28 @@ func filter_files(files, include_patterns, exclude_patterns) {
         i = i + 1
     }
     return sort_strings(out)
+}
+
+// Return the finite extension set implied by include patterns when every
+// pattern ends in a literal extension. Empty disables the fast path.
+export func include_extensions(patterns) {
+    let n = len(patterns)
+    if n == 0 {
+        return []
+    }
+    mut out = []
+    mut i = 0
+    while i < n {
+        let ext = file_ext(patterns[i])
+        if regex_match(ext, "^\\.[A-Za-z0-9]+$") == false {
+            return []
+        }
+        if arr_has(out, ext) == false {
+            out = push(out, ext)
+        }
+        i = i + 1
+    }
+    return out
 }
 
 // If no include patterns are configured, include everything; otherwise require

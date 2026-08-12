@@ -1,0 +1,2 @@
+from packages.core.service import service_name
+export func main() { return service_name() }

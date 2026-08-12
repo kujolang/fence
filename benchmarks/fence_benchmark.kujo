@@ -1,0 +1,118 @@
+// Deterministic, Kujo-native scale benchmark for Fence's walk and analysis hot
+// paths. The generated repository lives in a UUID-scoped /tmp directory and is
+// removed after each run.
+
+from src.walk import walk
+from src.analyze import analyze_files
+from src.config import normalize_config
+
+func fail(message) {
+    print("Fence benchmark: " + message)
+    exit(1)
+}
+
+func zone_for(index) {
+    let slot = index % 4
+    if slot == 0 { return "ui" }
+    if slot == 1 { return "domain" }
+    if slot == 2 { return "database" }
+    return "shared"
+}
+
+func benchmark_config(root) {
+    return normalize_config({
+        "version": 1,
+        "source_roots": [root + "/src"],
+        "unknown_dependency_policy": "deny",
+        "scan": {
+            "include": [root + "/src/**/*.ts"],
+            "exclude": []
+        },
+        "aliases": { "@": root + "/src" },
+        "zones": {
+            "ui": { "paths": [root + "/src/ui/**"], "can_depend_on": ["shared"] },
+            "domain": { "paths": [root + "/src/domain/**"], "can_depend_on": ["shared"] },
+            "database": { "paths": [root + "/src/database/**"], "can_depend_on": ["shared"] },
+            "shared": { "paths": [root + "/src/shared/**"], "can_depend_on": [] }
+        }
+    })
+}
+
+mut file_count = 1600
+let argv = args()
+mut ai = 0
+while ai < len(argv) {
+    if argv[ai] == "--files" && ai + 1 < len(argv) {
+        file_count = to_int(argv[ai + 1])
+        ai = ai + 2
+    } else {
+        fail("usage: kujo run benchmarks/fence_benchmark.kujo -- [--files COUNT]")
+    }
+}
+if file_count < 1 || file_count > 20000 {
+    fail("--files must be between 1 and 20000")
+}
+
+let root = "/tmp/fence-benchmark-" + uuid_v4()
+let src_root = root + "/src"
+create_dir(root)
+create_dir(src_root)
+let zone_names = ["ui", "domain", "database", "shared"]
+mut zi = 0
+while zi < len(zone_names) {
+    create_dir(src_root + "/" + zone_names[zi])
+    zi = zi + 1
+}
+
+mut generated = []
+let generation_started = performance_now()
+mut fi = 0
+mut bench_zone = ""
+mut generated_path = ""
+while fi < file_count {
+    bench_zone = zone_for(fi)
+    generated_path = src_root + "/" + bench_zone + "/file_" + to_string(fi) + ".ts"
+    write_file(generated_path, "import { target } from \"@/shared/target\"\nexport const value = " + to_string(fi) + "\n", true)
+    generated = push(generated, generated_path)
+    fi = fi + 1
+}
+let target_path = src_root + "/shared/target.ts"
+write_file(target_path, "export const target = true\n", true)
+generated = push(generated, target_path)
+let generation_ms = performance_now() - generation_started
+
+let cfg = benchmark_config(root)
+let walk_started = performance_now()
+let files = walk(cfg["source_roots"], cfg["include"], cfg["exclude"])
+let walk_ms = performance_now() - walk_started
+let analyze_started = performance_now()
+let result = analyze_files(files, cfg)
+let analyze_ms = performance_now() - analyze_started
+
+print(to_json_pretty({
+    "schema": "fence.benchmark/v1",
+    "engine": "kujo",
+    "requested_files": file_count,
+    "files_scanned": result["files_scanned"],
+    "imports_checked": result["imports_checked"],
+    "violations": len(result["violations"]),
+    "generation_ms": generation_ms,
+    "walk_ms": walk_ms,
+    "analyze_ms": analyze_ms,
+    "total_scan_ms": walk_ms + analyze_ms,
+    "metrics": result["metrics"]
+}))
+
+// Remove only the UUID-scoped tree created above.
+mut di = 0
+while di < len(generated) {
+    delete_file(generated[di])
+    di = di + 1
+}
+mut ri = 0
+while ri < len(zone_names) {
+    os_rmdir(src_root + "/" + zone_names[ri])
+    ri = ri + 1
+}
+os_rmdir(src_root)
+os_rmdir(root)

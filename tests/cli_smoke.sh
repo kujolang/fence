@@ -53,6 +53,7 @@ expect_exit 0 "$(run validate)" "validate clean config"
 expect_exit 0 "$(run check)" "check with no violations"
 # graph -> 0
 expect_exit 0 "$(run graph --format mermaid)" "graph mermaid"
+expect_exit 0 "$(run graph --observed --format json)" "graph observed json"
 # doctor -> 0
 expect_exit 0 "$(run doctor)" "doctor"
 # explain missing file -> 5
@@ -77,9 +78,30 @@ expect_exit 0 "$(run check --baseline)" "check --baseline suppresses"
 printf 'import { y } from "../database/orders"\n' >> src/ui/Bad.tsx
 printf 'export const y = 1\n' > src/database/orders.ts
 expect_exit 1 "$(run check --baseline)" "check --baseline fails on new violation"
+expect_exit 0 "$(run baseline prune)" "baseline prune"
 # A syntactically-valid but structurally-invalid baseline must not be accepted.
 printf '{"schema_version":1,"tool":"fence","fingerprints":"not-an-array"}\n' > fence-baseline.json
 expect_exit 3 "$(run check --baseline)" "invalid baseline schema is rejected"
+
+# Manifest-backed workspace generation in an isolated target.
+mkdir -p "$WORK/workspace/apps/web" "$WORK/workspace/packages/core"
+printf '{}\n' > "$WORK/workspace/apps/web/package.json"
+printf 'name = "core"\n' > "$WORK/workspace/packages/core/kujo.toml"
+cd "$WORK/workspace" || exit 6
+expect_exit 0 "$(run workspace init)" "workspace init"
+expect_exit 0 "$(run validate)" "workspace config validates"
+
+# Resource ceilings and output-root confinement.
+rm fence.toml
+mkdir -p src/a src/b reports
+printf 'export const a = 1\n' > src/a/a.ts
+printf 'export const b = 1\n' > src/b/b.ts
+printf '%s\n' '{"version":1,"source_roots":["src"],"output_roots":["reports"],"limits":{"max_files":1},"scan":{"include":["src/**/*.ts"]},"zones":{"all":{"paths":["src/**"]}}}' > fence.json
+expect_exit 4 "$(run check)" "max-files resource limit"
+printf '%s\n' '{"version":1,"source_roots":["src"],"output_roots":["reports"],"scan":{"include":["src/**/*.ts"]},"zones":{"all":{"paths":["src/**"]}}}' > fence.json
+expect_exit 5 "$(run check --output outside.json)" "output-root policy rejects sibling"
+expect_exit 0 "$(run check --output reports/fence.json)" "output-root policy allows child"
+cd "$WORK" || exit 6
 
 # Determinism: json output identical across two runs
 A="$("$KUJO" run "$FENCE" -- check --format json 2>/dev/null)"

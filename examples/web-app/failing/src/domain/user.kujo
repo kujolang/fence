@@ -1,0 +1,2 @@
+from src.ui.page import render_name
+export func user_name() { return render_name("Ada") }

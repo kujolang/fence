@@ -5,7 +5,7 @@ from src.config import load_config
 from src.validate import validate_config, count_errors
 from src.walk import walk
 from src.analyze import analyze_files
-from src.baseline import baseline_from_result, render_baseline, baseline_file
+from src.baseline import baseline_from_result, render_baseline, baseline_file, load_baseline, prune_baseline
 from src.output import write_safe
 
 export func cmd_baseline(parsed) {
@@ -15,10 +15,10 @@ export func cmd_baseline(parsed) {
         return 2
     }
     let sub = positionals[0]
-    if sub != "create" {
+    if sub != "create" && sub != "prune" {
         print_lines([
             "Unknown baseline subcommand: " + sub,
-            "Available: create"
+            "Available: create, prune"
         ])
         return 2
     }
@@ -40,17 +40,36 @@ export func cmd_baseline(parsed) {
 
     let files = walk(cfg["source_roots"], cfg["include"], cfg["exclude"])
     let result = analyze_files(files, cfg)
-    let obj = baseline_from_result(result)
+    mut obj = baseline_from_result(result)
+    mut pruned_count = 0
+    if sub == "prune" {
+        let existing = load_baseline()
+        if existing["found"] == false {
+            print("No fence-baseline.json found. Run: kujo run fence.kujo -- baseline create")
+            return 2
+        }
+        if existing["ok"] == false {
+            print("Error: fence-baseline.json has invalid JSON or an unsupported schema.")
+            return 3
+        }
+        let pruned = prune_baseline(result, existing["fingerprints"])
+        obj = pruned["baseline"]
+        pruned_count = len(pruned["removed"])
+    }
 
     let w = write_safe(baseline_file(), render_baseline(obj), true)
     if w["ok"] == false {
         print("Error: " + w["error"])
         return 5
     }
-    print_lines([
-        "Wrote " + baseline_file() + " with " + to_string(len(obj["fingerprints"])) + " baselined violation(s).",
-        "Future `check --baseline` runs will suppress these and fail only on NEW violations."
-    ])
+    if sub == "prune" {
+        print("Pruned " + to_string(pruned_count) + " stale baseline fingerprint(s); " + to_string(len(obj["fingerprints"])) + " remain.")
+    } else {
+        print_lines([
+            "Wrote " + baseline_file() + " with " + to_string(len(obj["fingerprints"])) + " baselined violation(s).",
+            "Future `check --baseline` runs will suppress these and fail only on NEW violations."
+        ])
+    }
     return 0
 }
 

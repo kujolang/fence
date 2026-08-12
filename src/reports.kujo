@@ -74,6 +74,8 @@ export func summarize(result, cfg) {
         "infos": infos,
         "failing": failing,
         "status": status,
+        "skipped_files": len(dict_get(result, "skipped_files", [])),
+        "ignored_violations": len(dict_get(result, "ignored_violations", [])),
         "zones": zone_summary(cfg["zone_names"], result["zone_files"], viols)
     }
 }
@@ -120,6 +122,8 @@ export func render_human(result, summary, config_path) {
     o = o + "Violations: " + to_string(summary["violations"]) + "\n"
     o = o + "Errors: " + to_string(summary["errors"]) + "\n"
     o = o + "Warnings: " + to_string(summary["warnings"]) + "\n"
+    o = o + "Skipped files: " + to_string(summary["skipped_files"]) + "\n"
+    o = o + "Ignored violations: " + to_string(summary["ignored_violations"]) + "\n"
 
     if len(viols) > 0 {
         o = o + "\nViolations\n----------\n"
@@ -130,6 +134,21 @@ export func render_human(result, summary, config_path) {
 
     o = o + "\nSummary by zone\n---------------\n"
     o = o + human_zone_summary(summary["zones"])
+    if summary["skipped_files"] > 0 {
+        o = o + "\nSkipped files\n-------------\n"
+        o = o + skipped_human(dict_get(result, "skipped_files", []))
+    }
+    return o
+}
+
+func skipped_human(items) {
+    let n = len(items)
+    mut o = ""
+    mut i = 0
+    while i < n {
+        o = o + "- " + items[i]["file"] + ": " + items[i]["reason"] + "\n"
+        i = i + 1
+    }
     return o
 }
 
@@ -185,10 +204,14 @@ export func render_json(result, summary, config_path) {
             "violations": summary["violations"],
             "errors": summary["errors"],
             "warnings": summary["warnings"]
+            ,"skipped_files": summary["skipped_files"]
+            ,"ignored_violations": summary["ignored_violations"]
         },
         "config": { "path": config_path },
         "zones": summary["zones"],
-        "violations": result["violations"]
+        "violations": result["violations"],
+        "skipped_files": dict_get(result, "skipped_files", []),
+        "ignored_violations": dict_get(result, "ignored_violations", [])
     }
     return to_json_pretty(obj)
 }
@@ -217,11 +240,34 @@ export func render_sarif(result, summary, config_path) {
         "runs": [
             {
                 "tool": { "driver": driver },
-                "results": sarif_results(result["violations"])
+                "results": sarif_results(result["violations"]),
+                "invocations": [sarif_invocation(dict_get(result, "skipped_files", []))]
             }
         ]
     }
     return to_json_pretty(obj)
+}
+
+func sarif_invocation(skipped) {
+    return {
+        "executionSuccessful": len(skipped) == 0,
+        "toolExecutionNotifications": sarif_skipped_notifications(skipped)
+    }
+}
+
+func sarif_skipped_notifications(skipped) {
+    let n = len(skipped)
+    mut out = []
+    mut i = 0
+    while i < n {
+        out = push(out, {
+            "level": "warning",
+            "message": { "text": skipped[i]["reason"] },
+            "locations": [{ "physicalLocation": { "artifactLocation": { "uri": skipped[i]["file"] } } }]
+        })
+        i = i + 1
+    }
+    return out
 }
 
 func sarif_results(viols) {
@@ -268,6 +314,8 @@ export func render_markdown(result, summary, config_path) {
     o = o + "- Files scanned: " + to_string(summary["files_scanned"]) + "\n"
     o = o + "- Imports checked: " + to_string(summary["imports_checked"]) + "\n"
     o = o + "- Violations: " + to_string(summary["violations"]) + " (" + to_string(summary["errors"]) + " errors, " + to_string(summary["warnings"]) + " warnings)\n\n"
+    o = o + "- Skipped files: " + to_string(summary["skipped_files"]) + "\n\n"
+    o = o + "- Ignored violations: " + to_string(summary["ignored_violations"]) + "\n\n"
 
     o = o + "## Violations\n\n"
     o = o + md_severity_section(viols, "error")
@@ -282,6 +330,21 @@ export func render_markdown(result, summary, config_path) {
 
     o = o + "## AI / Human Handoff\n\n"
     o = o + md_handoff(summary, viols)
+    if summary["skipped_files"] > 0 {
+        o = o + "\n## Skipped Files\n\n"
+        o = o + skipped_markdown(dict_get(result, "skipped_files", []))
+    }
+    return o
+}
+
+func skipped_markdown(items) {
+    let n = len(items)
+    mut o = ""
+    mut i = 0
+    while i < n {
+        o = o + "- `" + items[i]["file"] + "`: " + items[i]["reason"] + "\n"
+        i = i + 1
+    }
     return o
 }
 

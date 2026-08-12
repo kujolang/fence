@@ -1,0 +1,2 @@
+from apps.web.main import app_name
+export func service_name() { return app_name() }

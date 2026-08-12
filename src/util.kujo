@@ -79,3 +79,8 @@ export func count_in(arr, needle) {
     }
     return c
 }
+
+// Exact UTF-8 byte count for report/resource budgets.
+export func utf8_byte_length(text) {
+    return len(decode_base64(encode_base64(to_string(text))))
+}

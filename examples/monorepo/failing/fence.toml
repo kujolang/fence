@@ -1,0 +1,13 @@
+version = 1
+source_roots = ["apps", "packages"]
+unknown_dependency_policy = "deny"
+[scan]
+include = ["apps/**/*.kujo", "packages/**/*.kujo"]
+[zones.app_web]
+paths = ["apps/web/**"]
+can_depend_on = ["pkg_core"]
+cannot_depend_on = []
+[zones.pkg_core]
+paths = ["packages/core/**"]
+can_depend_on = []
+cannot_depend_on = ["app_web"]

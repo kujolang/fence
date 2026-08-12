@@ -1,0 +1,26 @@
+// Narrow, reviewable violation exceptions. Every entry requires a reason and
+// expiry date; expired entries never suppress findings.
+
+from src.util import dict_get
+from src.glob import glob_match
+
+export func ignore_match(v, entries) {
+    let today = format_date(now(), "YYYY-MM-DD")
+    let n = len(entries)
+    mut i = 0
+    while i < n {
+        let entry = entries[i]
+        if dict_get(entry, "expires", "") >= today {
+            if field_match(dict_get(entry, "from_zone", "*"), v["from_zone"]) && field_match(dict_get(entry, "to_zone", "*"), v["to_zone"]) && glob_match(dict_get(entry, "file", "**"), v["file"]) && field_match(dict_get(entry, "import", "*"), v["import"]) {
+                return { "ignored": true, "reason": dict_get(entry, "reason", ""), "expires": dict_get(entry, "expires", "") }
+            }
+        }
+        i = i + 1
+    }
+    return { "ignored": false, "reason": "", "expires": "" }
+}
+
+func field_match(pattern, value) {
+    if pattern == "*" { return true }
+    return pattern == value
+}

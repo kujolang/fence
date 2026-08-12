@@ -76,12 +76,20 @@ export func normalize_config(raw) {
     cfg["default_severity"] = dict_get(raw, "default_severity", "error")
     cfg["fail_on"] = dict_get(raw, "fail_on", "error")
     cfg["unknown_dependency_policy"] = dict_get(raw, "unknown_dependency_policy", "warn")
+    cfg["output_roots"] = dict_get(raw, "output_roots", [])
+
+    let limits = dict_get(raw, "limits", {})
+    cfg["max_files"] = dict_get(limits, "max_files", 0)
+    cfg["max_imports"] = dict_get(limits, "max_imports", 0)
+    cfg["max_report_bytes"] = dict_get(limits, "max_report_bytes", 0)
 
     let scan = dict_get(raw, "scan", {})
     cfg["include"] = dict_get(scan, "include", [])
     cfg["exclude"] = dict_get(scan, "exclude", [])
 
     cfg["aliases"] = dict_get(raw, "aliases", {})
+    cfg["go_module"] = dict_get(raw, "go_module", "")
+    cfg["ignores"] = dict_get(raw, "ignores", [])
 
     // Optional external dependency allow/deny lists.
     let ext = dict_get(raw, "external", {})

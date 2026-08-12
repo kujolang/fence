@@ -6,12 +6,13 @@ from src.validate import validate_config, count_errors
 from src.walk import walk
 from src.analyze import analyze_files
 from src.reports import summarize, render_human, render_json, render_markdown, render_sarif
-from src.output import write_safe
+from src.output import write_safe_under
 from src.cliargs import flag_or, has_flag
 from src.git import changed_files
 from src.glob import glob_match
 from src.baseline import load_baseline, apply_baseline
 from src.meta import no_config_text
+from src.util import utf8_byte_length
 
 export func cmd_check(parsed) {
     let flags = parsed["flags"]
@@ -48,8 +49,16 @@ export func cmd_check(parsed) {
         return file_res["code"]
     }
     let files = file_res["files"]
+    if cfg["max_files"] > 0 && len(files) > cfg["max_files"] {
+        print("Error: resource limit exceeded: " + to_string(len(files)) + " files selected, limit is " + to_string(cfg["max_files"]))
+        return 4
+    }
 
     mut result = analyze_files(files, cfg)
+    if cfg["max_imports"] > 0 && result["imports_checked"] > cfg["max_imports"] {
+        print("Error: resource limit exceeded: " + to_string(result["imports_checked"]) + " imports checked, limit is " + to_string(cfg["max_imports"]))
+        return 4
+    }
 
     // Optional baseline suppression of pre-existing violations.
     mut suppressed = 0
@@ -76,13 +85,18 @@ export func cmd_check(parsed) {
         print("Error: " + rendered["error"])
         return 2
     }
+    let report_bytes = utf8_byte_length(rendered["text"])
+    if cfg["max_report_bytes"] > 0 && report_bytes > cfg["max_report_bytes"] {
+        print("Error: resource limit exceeded: report is " + to_string(report_bytes) + " bytes, limit is " + to_string(cfg["max_report_bytes"]))
+        return 4
+    }
 
     let quiet = has_flag(flags, "quiet")
     let summary_only = has_flag(flags, "summary-only")
 
     let output_path = flag_or(flags, "output", "")
     if output_path != "" {
-        let w = write_safe(output_path, rendered["text"], true)
+        let w = write_safe_under(output_path, rendered["text"], true, cfg["output_roots"])
         if w["ok"] == false {
             print("Error: " + w["error"])
             return 5

@@ -40,6 +40,32 @@ export func write_safe(path, content, allow_overwrite) {
     return { "ok": true, "error": "" }
 }
 
+// Apply optional enterprise output-root policy before the standard path and
+// symlink checks. Empty roots preserve the v1-compatible default.
+export func write_safe_under(path, content, allow_overwrite, roots) {
+    if output_root_allowed(path, roots) == false {
+        return { "ok": false, "error": "output path is outside configured output_roots: " + path }
+    }
+    return write_safe(path, content, allow_overwrite)
+}
+
+export func output_root_allowed(path, roots) {
+    if len(roots) == 0 {
+        return true
+    }
+    let p = normalize_sep(path)
+    let n = len(roots)
+    mut i = 0
+    while i < n {
+        let root = normalize_sep(roots[i])
+        if p == root || starts_with(p, root + "/") {
+            return true
+        }
+        i = i + 1
+    }
+    return false
+}
+
 // True when the resolved nearest-existing-ancestor of `p` is inside cwd.
 func within_cwd(p) {
     let anchor = nearest_existing_ancestor(p)

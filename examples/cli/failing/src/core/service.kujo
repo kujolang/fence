@@ -1,0 +1,2 @@
+from src.commands.run import print_result
+export func execute() { return print_result() }

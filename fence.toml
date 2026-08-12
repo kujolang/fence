@@ -35,6 +35,7 @@ paths = [
   "src/resolve.kujo",
   "src/zones.kujo",
   "src/rules.kujo",
+  "src/ignores.kujo",
   "src/cycles.kujo",
   "src/graph.kujo",
   "src/reports.kujo",

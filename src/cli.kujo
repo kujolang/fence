@@ -13,6 +13,7 @@ from src.cmd_check import cmd_check
 from src.cmd_explain import cmd_explain
 from src.cmd_graph import cmd_graph
 from src.cmd_baseline import cmd_baseline
+from src.cmd_workspace import cmd_workspace
 
 // Flags that always consume the following token as their value.
 func value_flags() {
@@ -70,6 +71,9 @@ export func cli_dispatch(argv) {
     }
     if cmd == "baseline" {
         return cmd_baseline(parsed)
+    }
+    if cmd == "workspace" {
+        return cmd_workspace(parsed)
     }
 
     print("Unknown command: " + cmd)

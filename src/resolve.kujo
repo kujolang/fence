@@ -233,6 +233,10 @@ func python_rel_base(raw, current_file) {
 
 // Main entry point.
 export func resolve_import(raw, current_file, source_roots, aliases) {
+    return resolve_import_with_go(raw, current_file, source_roots, aliases, "")
+}
+
+export func resolve_import_with_go(raw, current_file, source_roots, aliases, go_module) {
     // 1. JS/TS relative.
     if is_rel_slash(raw) {
         let base_rel = join_path(parent_dir(current_file), raw)
@@ -266,7 +270,17 @@ export func resolve_import(raw, current_file, source_roots, aliases) {
         }
     }
 
-    // 4. Alias prefix.
+    // 4. Go module prefix, e.g. `github.com/acme/app/domain` -> `domain`.
+    if file_ext(current_file) == ".go" && go_module != "" {
+        if starts_with(raw, go_module + "/") {
+            let go_path = substring(raw, len(go_module) + 1, len(raw))
+            let r_go = try_under_roots(go_path, source_roots)
+            if r_go != "" { return mk("internal", r_go, raw) }
+            return mk("unknown", "", raw)
+        }
+    }
+
+    // 5. Alias prefix.
     let aliased = apply_alias(raw, aliases)
     if aliased != "" {
         let r_alias = try_candidates(aliased)
@@ -276,7 +290,7 @@ export func resolve_import(raw, current_file, source_roots, aliases) {
         return mk("unknown", "", raw)
     }
 
-    // 5. Root-relative / dotted module path.
+    // 6. Root-relative / dotted module path.
     let modpath = module_to_path(raw)
     let direct = try_candidates(modpath)
     if direct != "" {
@@ -287,7 +301,7 @@ export func resolve_import(raw, current_file, source_roots, aliases) {
         return mk("internal", under, raw)
     }
 
-    // 6. Anything else is an external package.
+    // 7. Anything else is an external package.
     return mk("external", "", raw)
 }
 

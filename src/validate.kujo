@@ -75,6 +75,9 @@ export func validate_config(cfg) {
     if valid_severity(cfg["default_severity"]) == false {
         out = push(out, diag("error", "invalid default_severity '" + to_string(cfg["default_severity"]) + "' (use info, warning, error)"))
     }
+    out = validate_limits(cfg, out)
+    out = validate_output_roots(cfg["output_roots"], out)
+    out = validate_ignores(cfg["ignores"], out)
 
     // Config schema version guard.
     if to_string(cfg["version"]) != "1" {
@@ -93,6 +96,57 @@ export func validate_config(cfg) {
         out = push(out, diag("warning", "dependency cycle in allowed edges: " + join_strings(cyc, " -> ")))
     }
 
+    return out
+}
+
+func validate_ignores(entries, acc) {
+    mut out = acc
+    let n = len(entries)
+    mut i = 0
+    while i < n {
+        let e = entries[i]
+        if type_of(e) != "dict" {
+            out = push(out, diag("error", "each [[ignores]] entry must be a table"))
+        } else {
+            if dict_has(e, "reason") == false || trim(to_string(e["reason"])) == "" {
+                out = push(out, diag("error", "ignores entry " + to_string(i + 1) + " requires a non-empty reason"))
+            }
+            if dict_has(e, "expires") == false || regex_match(to_string(e["expires"]), "^[0-9]{4}-[0-9]{2}-[0-9]{2}$") == false {
+                out = push(out, diag("error", "ignores entry " + to_string(i + 1) + " requires expires = YYYY-MM-DD"))
+            }
+        }
+        i = i + 1
+    }
+    return out
+}
+
+func validate_limits(cfg, acc) {
+    mut out = acc
+    let names = ["max_files", "max_imports", "max_report_bytes"]
+    let n = len(names)
+    mut i = 0
+    while i < n {
+        let name = names[i]
+        let value = cfg[name]
+        if type_of(value) != "int" || value < 0 {
+            out = push(out, diag("error", "limits." + name + " must be a non-negative integer (0 = unlimited)"))
+        }
+        i = i + 1
+    }
+    return out
+}
+
+func validate_output_roots(roots, acc) {
+    mut out = acc
+    let n = len(roots)
+    mut i = 0
+    while i < n {
+        let root = roots[i]
+        if type_of(root) != "string" || root == "" || starts_with(root, "/") || starts_with(root, "~") || contains(root, "..") == 1 || contains(root, ":") == 1 {
+            out = push(out, diag("error", "output_roots entries must be safe, non-empty repo-relative directories"))
+        }
+        i = i + 1
+    }
     return out
 }
 
