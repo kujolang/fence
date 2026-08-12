@@ -13,6 +13,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   comments, Go aliased single imports, and PHP `__DIR__` includes.
 - Resolve Rust `mod`, `self::`, and `super::` paths relative to their declaring
   modules, and prefer the longest matching configured alias prefix.
+- Report actionable shallow-checkout guidance when a changed-only base is not
+  available locally.
 
 ### Added
 - Launch readiness spec and deterministic Eval suite for prelaunch review evidence.
@@ -20,16 +22,29 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   one dependency record per imported module.
 - Tests cover grouped Python imports, leading-dash Git refs, and `.git/` output
   paths.
+- Import and violation records carry one-based source lines; SARIF locations now
+  include `region.startLine`.
+- Added the `monorepo` starter template for `apps/`, `packages/`, and `tools/`.
+- Rust grouped `use` statements and root-qualified PHP namespaces are detected.
+
+### Performance
+- Memoize import resolution and zone classification within each analysis run to
+  avoid repeated filesystem probes and glob matching while preserving contextual
+  relative-import semantics.
 
 ### Security
 - `--changed-only --base` now rejects refs beginning with `-` to prevent Git
   option injection.
+- Git refs also reject ambiguous ranges/reflogs, repeated slashes, `.lock`
+  suffixes, and trailing dots/slashes.
 - Report output paths now reject `.git` path segments in addition to existing
   absolute-path, home, parent-traversal, and symlink-parent escape guards.
 
 ### Documentation
 - Moved local implementation prompt history under the ignored `agent/` archive
   and updated the public project layout/docs to keep the root production-focused.
+- Added a runnable demo, enterprise adoption guide, release checklist, and a new
+  production-readiness backlog.
 
 ## [1.0.0] - 2026-06-10
 

@@ -1,5 +1,9 @@
 # Fence Next Enhancement Checklist
 
+> Historical review backlog. The August 2026 review completed or refined many
+> of these items; use [the current checklist](NEXT_ENHANCEMENTS_2026-08-12.md)
+> for future work.
+
 This is the next-session backlog after the June 19, 2026 hardening review. The
 current codebase is strong enough to present as a polished Kujo-native v1, but
 these items would make Fence more universally useful in larger enterprise repos.

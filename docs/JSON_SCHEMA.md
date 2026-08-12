@@ -40,6 +40,7 @@ warn on values they do not recognize.
       "from_zone": "ui",
       "to_zone": "database",
       "file": "src/ui/LoginForm.tsx",
+      "line": 12,
       "import": "../database/users",
       "resolved": "src/database/users.ts",
       "rule": "zones.ui.cannot_depend_on includes database",
@@ -76,6 +77,7 @@ warn on values they do not recognize.
 | `from_zone` | string | Zone of the importing file. |
 | `to_zone` | string | Target zone, or `unknown` when unmappable. |
 | `file` | string | Repo-relative path of the importing file. |
+| `line` | int | One-based line containing the detected import. |
 | `import` | string | The import string exactly as written. |
 | `resolved` | string | Resolved repo-relative target path, or `""`. |
 | `rule` | string | The config rule that produced the verdict. |
@@ -89,6 +91,7 @@ warn on values they do not recognize.
 - New optional fields may be added under the same `schema_version`; consumers
   should ignore unknown fields. Removing or renaming a field bumps
   `schema_version`.
+- SARIF results include the same line as `physicalLocation.region.startLine`.
 
 ## Exit codes (companion to JSON)
 

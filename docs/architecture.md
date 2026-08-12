@@ -20,7 +20,7 @@ flowchart LR
 2. **walk** (`walk.kujo`) traverses `source_roots`, applying include/exclude
    globs, via an explicit stack (no recursion).
 3. **extract imports** (`imports.kujo`, `imports_ext.kujo`) scans each file
-   line-by-line for import statements.
+   line-by-line for import statements and records one-based source lines.
 4. **resolve** (`resolve.kujo`) maps a raw import to an internal file, an
    external package, or unknown.
 5. **map zone** (`zones.kujo`) finds the first zone whose `paths` match.
@@ -28,7 +28,9 @@ flowchart LR
 7. **render** (`reports.kujo`, `graph.kujo`) produces human/JSON/markdown/SARIF.
 
 The orchestration lives in `analyze.kujo` (`analyze_files`), driven by the
-command modules.
+command modules. Analysis maintains per-run import-resolution and zone-match
+caches; both are discarded at process exit and cannot affect deterministic
+output.
 
 ## Module map
 

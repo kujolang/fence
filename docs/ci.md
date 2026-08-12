@@ -23,10 +23,11 @@ the diff:
 kujo run fence.kujo -- check --changed-only --base origin/main --fail-on error
 ```
 
-`--base` refs are strictly validated (`^[A-Za-z0-9._/~^-]+$`, non-empty,
-non-leading-dash) before being passed to Git, so untrusted branch names cannot
-inject shell commands or Git options. If the workspace is not a Git repo, the
-command fails clearly.
+`--base` refs are strictly validated (safe character set, non-empty,
+non-leading-dash, and no revision ranges, reflog selectors, repeated slashes,
+`.lock` suffixes, or trailing dots/slashes) before being passed to Git. If the
+base is absent in a shallow checkout, Fence reports an actionable fetch-history
+hint; it never fetches or touches the network itself.
 
 ## Adopting on a legacy codebase
 

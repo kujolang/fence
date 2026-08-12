@@ -15,7 +15,7 @@ kujo run fence.kujo -- init --force          # overwrite an existing config
 
 | Flag | Meaning |
 | --- | --- |
-| `--template <name>` | `layered` (default), `cli`, `web-app`, `hexagonal`, `mvc`, `feature-sliced` |
+| `--template <name>` | `layered` (default), `cli`, `web-app`, `hexagonal`, `mvc`, `feature-sliced`, `monorepo` |
 | `--force` | Overwrite an existing `fence.toml` |
 
 Refuses to overwrite without `--force` (exit `2`).
@@ -48,8 +48,9 @@ kujo run fence.kujo -- check --quiet
 | `--no-color` | Accepted for CI compatibility (output is already plain) |
 
 Exit `0` when clean at the threshold, `1` when violations reach it.
-The `--base` value must be a shell-safe Git ref and may not start with `-`, so it
-cannot be interpreted as a Git option.
+The `--base` value must be a shell-safe, unambiguous Git ref and may not start
+with `-`. Revision ranges, reflog selectors, repeated slashes, `.lock` suffixes,
+and trailing dots/slashes are rejected before Git runs.
 
 ## `explain <path>`
 

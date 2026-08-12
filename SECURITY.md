@@ -8,9 +8,9 @@ Fence is local-first and minimizes its trust surface by design:
 - **No code execution from config.** `fence.toml` is parsed as data only; it is
   never evaluated.
 - **No shell interpolation of untrusted input.** The only subprocesses are Git
-  commands for `--changed-only` / diagnostics. Ref names (`--base`) are strictly
-  validated against `^[A-Za-z0-9._/~^-]+$` (length-capped) before use, so branch
-  names cannot inject shell commands.
+  commands for `--changed-only` / diagnostics. Ref names (`--base`) are
+  length-capped, character-restricted, option-safe, and rejected when they use
+  ambiguous range/reflog or invalid ref syntax.
 - **Path-safe writes.** File output (`init`, `--output`, `baseline create`) is
   restricted to the working directory: absolute paths, `~`, `..`, and
   drive-letter paths are rejected, and a symlinked parent that would escape the

@@ -33,12 +33,21 @@ with `files × imports`, i.e. ~40–55 ms per file on this machine.
 - **Typical interactive repos** (tens to low hundreds of files) complete in a few
   seconds for a full scan.
 
+## Current optimizations
+
+- Import resolution is memoized per run. Repo-root, alias, and external imports
+  share a raw-import cache entry; relative and Rust module imports include the
+  importer path in the key so context-dependent resolution stays correct.
+- Zone classification is memoized by normalized repository path for both source
+  files and resolved targets.
+- Both caches are process-local, deterministic, and discarded after each check.
+
 ## Notes for optimizers
 
 If a future change targets throughput (see `docs/ENHANCEMENTS.md`):
 
-- The hot paths are `walk`/`glob_match` (file filtering) and `analyze_files`
-  (per-import `resolve_import` + `match_zone`).
+- The remaining hot paths are `walk`/`glob_match` (file filtering), first-time
+  candidate probes, and import extraction.
 - String sorting already uses the native `sort` builtin.
 - `normalize_sep` avoids allocation when a path has no backslash.
 - Reducing per-import function-call depth (the VM has notable call overhead) is

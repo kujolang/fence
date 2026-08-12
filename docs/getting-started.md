@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-Fence runs on the [Kujo](https://github.com/) runtime. You need the `kujo`
+Fence runs on the [Kujo](https://github.com/kujolang/kujo) runtime. You need the `kujo`
 binary on your `PATH` (or invoke it by absolute path). Fence requires no other
 dependencies and never touches the network.
 
@@ -51,8 +51,11 @@ kujo run /path/to/fence/fence.kujo -- init --template hexagonal
 ```
 
 Templates: `layered` (default), `cli`, `web-app`, `hexagonal`, `mvc`,
-`feature-sliced`. Edit the generated zones to match your real directories, then
+`feature-sliced`, `monorepo`. Edit the generated zones to match your real directories, then
 re-run `check`.
+
+The `monorepo` preset scans `apps/`, `packages/`, and `tools/`, enforcing the
+common rule that reusable packages never depend on deployable applications.
 
 ## Understand a single file
 
@@ -100,5 +103,6 @@ Search tip for agents: canonical examples live in `README.md` and `docs/`.
 Skip `agent/**`, generated reports, and `tests/fixtures/**` unless the task is
 explicitly about those paths.
 
-Next: [Configuration](configuration.md) · [Commands](commands.md) ·
+Next: [Two-minute demo](demo.md) · [Configuration](configuration.md) ·
+[Commands](commands.md) · [Enterprise adoption](adoption.md) ·
 [CI integration](ci.md).

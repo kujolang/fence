@@ -50,8 +50,8 @@ safe to gate CI and to hand to autonomous agents as an architectural constraint.
 Fence reads `fence.toml` (architecture **zones** with `paths` /
 `can_depend_on` / `cannot_depend_on` / `severity`), scans your source files,
 extracts their imports, maps each file to a zone, and reports every dependency
-that crosses a boundary the contract forbids — with a deterministic fix
-suggestion for each.
+that crosses a boundary the contract forbids — with its import line and a
+deterministic fix suggestion.
 
 Supported scan languages (best-effort, line-based import detection): Kujo,
 JavaScript/TypeScript, Python, Rust, PHP, Go. **Fence itself is 100% Kujo.**
@@ -97,13 +97,15 @@ kujo run /path/to/fence/fence.kujo -- check
 | `version` / `--version` | Version text |
 
 Templates: `layered` (default), `cli`, `web-app`, `hexagonal`, `mvc`,
-`feature-sliced`.
+`feature-sliced`, `monorepo`.
 
 ## Documentation
 
 | Page | Contents |
 | --- | --- |
 | [Getting started](docs/getting-started.md) | Install, first run, the agent workflow |
+| [Two-minute demo](docs/demo.md) | Runnable violation-to-clean transcript |
+| [Enterprise adoption](docs/adoption.md) | Observe, baseline, PR gate, ownership |
 | [Configuration](docs/configuration.md) | `fence.toml` reference, zones, severities, external deps |
 | [Commands](docs/commands.md) | Every command and flag with examples |
 | [CI integration](docs/ci.md) | Gating builds, changed-only, baselines, SARIF |
@@ -111,8 +113,9 @@ Templates: `layered` (default), `cli`, `web-app`, `hexagonal`, `mvc`,
 | [Architecture](docs/architecture.md) | Module map and how the pipeline works |
 | [Performance](docs/performance.md) | Measured numbers and scaling guidance |
 | [FAQ](docs/faq.md) · [Troubleshooting](docs/troubleshooting.md) | Common questions and fixes |
+| [Release checklist](docs/release.md) | Repeatable validation and release gates |
 | [Completed v1 checklist](docs/ENHANCEMENTS.md) | Prior hardening work already completed |
-| [Next enhancements](docs/NEXT_ENHANCEMENTS_2026-06-19.md) | Next-session roadmap |
+| [Next enhancements](docs/NEXT_ENHANCEMENTS_2026-08-12.md) | Next-session roadmap |
 
 ## Example output
 
@@ -130,7 +133,7 @@ Warnings: 0
 Violations
 ----------
 [ERROR] ui -> database is not allowed
-  File: src/ui/LoginForm.tsx
+  File: src/ui/LoginForm.tsx:12
   Import: ../database/users
   Resolved: src/database/users.ts
   Rule: zones.ui.cannot_depend_on includes database
@@ -182,7 +185,7 @@ plus `.git`, parent-traversal, absolute-path, and symlink-escape guards). See
 ```
 fence.kujo              entry point (args -> dispatch -> exit code)
 src/*.kujo              implementation modules (see docs/architecture.md)
-tests/fence_tests.kujo  run-mode test harness (123 assertions)
+tests/fence_tests.kujo  run-mode test harness (136 assertions)
 docs/                   documentation
 agent/                  ignored archive of implementation prompts and handoffs
 ```
