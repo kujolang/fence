@@ -47,7 +47,7 @@ run_gate("failing web example", [kujo, "run", entry, "--", "check"], path_join(r
 run_gate("passing monorepo example", [kujo, "run", entry, "--", "check"], path_join(root, "examples/monorepo/passing"), 0)
 run_gate("failing monorepo example", [kujo, "run", entry, "--", "check"], path_join(root, "examples/monorepo/failing"), 1)
 
-let release_dir = path_join("/tmp", "fence-release-verify-" + uuid_v4())
+let release_dir = path_join(root, ".fence-release-verify-" + uuid_v4())
 run_gate("release integrity generation", [kujo, "run", "scripts/release_artifacts.kujo", "--", "--output", release_dir], root, 0)
 let artifacts = ["SHA256SUMS", "sbom.spdx.json", "provenance.intoto.json"]
 mut ai = 0

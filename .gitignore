@@ -86,6 +86,7 @@
 /FENCE_REPORT.md
 /fence.sarif
 /.fence/
+/.fence-release-verify-*/
 /architecture.mmd
 /architecture.dot
 

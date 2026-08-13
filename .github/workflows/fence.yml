@@ -2,8 +2,7 @@
 #
 # This YAML is configuration (not an implementation language), which is allowed
 # alongside the Kujo-only tool. Adjust the "Install Kujo" step to your
-# environment: build the Kujo interpreter, download a release binary, or run a
-# container that already provides `kujo` on PATH.
+# environment. CI builds the pinned supported Kujo runtime from source.
 name: fence
 
 on:
@@ -11,20 +10,33 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
   architecture:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0          # required for --changed-only --base
 
-      - name: Install Kujo
-        run: |
-          # Provide the `kujo` binary on PATH. Replace with your install method,
-          # e.g. download a prebuilt release or build from source.
-          echo "Ensure 'kujo' is available on PATH before the next step."
-          kujo --version
+      - name: Checkout pinned Kujo runtime
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: kujolang/kujo
+          ref: v1.0.1
+          path: kujo-runtime
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable 2026-08-12
+      - name: Cache Kujo build
+        uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2.9.2
+        with:
+          workspaces: kujo-runtime
+      - name: Build Kujo
+        run: cargo build --release --locked --manifest-path kujo-runtime/Cargo.toml
+      - name: Add Kujo to PATH
+        run: echo "$PWD/kujo-runtime/target/release" >> "$GITHUB_PATH"
 
       - name: Lint Fence sources
         run: |
@@ -46,6 +58,6 @@ jobs:
 
       - name: Upload SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@3b0bd1d116c0bde30213346b22d4f634d96a2fb0
+        uses: github/codeql-action/upload-sarif@24c7eb380a2dc368f2d129e4c65e51d172983a1e # v4
         with:
           sarif_file: fence.sarif
