@@ -11,7 +11,7 @@ if len(argv) != 0 && len(argv) != 2 {
 }
 
 if path_is_dir(output) == false { create_dir(output) }
-mut files = ["fence.kujo", "fence.sh", "README.md", "LICENSE"]
+mut files = ["fence.kujo", "fence.sh", "kennel.toml", "README.md", "LICENSE", "CHANGELOG.md", "SECURITY.md"]
 let src_names = sort(list_dir("src"))
 mut i = 0
 while i < len(src_names) {

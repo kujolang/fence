@@ -1,0 +1,36 @@
+[package]
+name = "fence"
+version = "1.0.0"
+description = "Deterministic, local-first architecture-boundary enforcement for polyglot repositories."
+license = "MIT"
+authors = ["Kujolang <contact@kujolang.ai>"]
+repository = "https://github.com/kujolang/fence"
+documentation = "https://github.com/kujolang/fence/tree/main/docs"
+keywords = ["kujo", "architecture", "boundaries", "ci", "developer-tools"]
+categories = ["developer-tools", "code-quality"]
+readme = "README.md"
+
+[package.status]
+stage = "production"
+stability = "stable"
+public_api = true
+notes = "Stable v1 CLI, configuration, JSON, and SARIF contracts for local and CI enforcement."
+
+[kujo]
+minimum_version = "1.0.1"
+entry = "fence.kujo"
+sources = ["src", "."]
+includes = ["README.md", "LICENSE", "CHANGELOG.md", "SECURITY.md", "docs", "examples", "tests", "scripts", "benchmarks"]
+excludes = [".git", ".fence", "dist", "build", "node_modules"]
+
+[scripts]
+test = "kujo run tests/fence_tests.kujo"
+verify = "kujo run scripts/verify_release.kujo"
+smoke = "sh tests/cli_smoke.sh"
+
+[dependencies]
+
+[trust]
+checksum = ""
+signature = ""
+signing_key = ""

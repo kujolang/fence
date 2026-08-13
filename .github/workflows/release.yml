@@ -1,0 +1,45 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout pinned Kujo runtime
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: kujolang/kujo
+          ref: v1.0.1
+          path: kujo-runtime
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable 2026-08-12
+      - name: Build Kujo
+        run: cargo build --release --locked --manifest-path kujo-runtime/Cargo.toml
+      - name: Add Kujo to PATH
+        run: echo "$PWD/kujo-runtime/target/release" >> "$GITHUB_PATH"
+      - name: Verify release gates
+        run: kujo run scripts/verify_release.kujo
+      - name: Generate deterministic integrity artifacts
+        run: kujo run scripts/release_artifacts.kujo -- --output dist/release
+      - name: Verify generated checksums
+        run: sha256sum --check dist/release/SHA256SUMS
+      - name: Create keyless Sigstore-backed provenance attestations
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: |
+            dist/release/SHA256SUMS
+            dist/release/sbom.spdx.json
+            dist/release/provenance.intoto.json
+      - name: Publish verified GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/release/* --verify-tag --generate-notes --title "Fence ${GITHUB_REF_NAME}"

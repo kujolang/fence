@@ -1,0 +1,63 @@
+// Cross-platform release gate. Orchestration is Kujo-native; the existing POSIX
+// CLI smoke wrapper remains the only shell test because it verifies shell exit
+// semantics directly.
+
+mut kujo = "kujo"
+let argv = args()
+if len(argv) == 2 && argv[0] == "--kujo" { kujo = argv[1] }
+if len(argv) != 0 && len(argv) != 2 {
+    print("Usage: kujo run scripts/verify_release.kujo -- [--kujo PATH]")
+    exit(2)
+}
+
+func run_gate(label, command, cwd, expected) {
+    let result = spawn_process(command, { "cwd": cwd, "timeout_ms": 600000, "max_output_bytes": 4194304 })
+    if result.exitcode != expected {
+        eprint("FAIL: " + label + " (exit " + to_string(result.exitcode) + ", expected " + to_string(expected) + ")")
+        if trim(result.stdout) != "" { eprint(result.stdout) }
+        if trim(result.stderr) != "" { eprint(result.stderr) }
+        exit(1)
+    }
+    print("PASS: " + label)
+}
+
+let root = os_getcwd()
+let entry = path_join(root, "fence.kujo")
+mut sources = ["fence.kujo", "tests/fence_tests.kujo", "scripts/release_artifacts.kujo"]
+let source_names = sort(list_dir("src"))
+mut si = 0
+while si < len(source_names) {
+    if ends_with(source_names[si], ".kujo") { sources = push(sources, "src/" + source_names[si]) }
+    si = si + 1
+}
+mut ci = 0
+while ci < len(sources) {
+    run_gate("static check " + sources[ci], [kujo, "check", sources[ci]], root, 0)
+    ci = ci + 1
+}
+
+run_gate("unit and contract suite", [kujo, "run", "tests/fence_tests.kujo"], root, 0)
+run_gate("CLI smoke suite", ["sh", "tests/cli_smoke.sh"], root, 0)
+run_gate("self config validation", [kujo, "run", entry, "--", "validate"], root, 0)
+run_gate("self architecture check", [kujo, "run", entry, "--", "check", "--format", "json"], root, 0)
+run_gate("passing CLI example", [kujo, "run", entry, "--", "check"], path_join(root, "examples/cli/passing"), 0)
+run_gate("failing CLI example", [kujo, "run", entry, "--", "check"], path_join(root, "examples/cli/failing"), 1)
+run_gate("passing web example", [kujo, "run", entry, "--", "check"], path_join(root, "examples/web-app/passing"), 0)
+run_gate("failing web example", [kujo, "run", entry, "--", "check"], path_join(root, "examples/web-app/failing"), 1)
+run_gate("passing monorepo example", [kujo, "run", entry, "--", "check"], path_join(root, "examples/monorepo/passing"), 0)
+run_gate("failing monorepo example", [kujo, "run", entry, "--", "check"], path_join(root, "examples/monorepo/failing"), 1)
+
+let release_dir = path_join("/tmp", "fence-release-verify-" + uuid_v4())
+run_gate("release integrity generation", [kujo, "run", "scripts/release_artifacts.kujo", "--", "--output", release_dir], root, 0)
+let artifacts = ["SHA256SUMS", "sbom.spdx.json", "provenance.intoto.json"]
+mut ai = 0
+while ai < len(artifacts) {
+    if path_is_file(path_join(release_dir, artifacts[ai])) == false {
+        eprint("FAIL: missing release artifact " + artifacts[ai])
+        exit(1)
+    }
+    delete_file(path_join(release_dir, artifacts[ai]))
+    ai = ai + 1
+}
+os_rmdir(release_dir)
+print("Fence release verification passed.")
