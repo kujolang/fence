@@ -65,7 +65,7 @@ func cache_directory_safe() {
     mut cwd = ""
     try {
         absolute = normalize_sep(path_absolute(".fence"))
-        cwd = normalize_sep(os_getcwd())
+        cwd = normalize_sep(path_absolute("."))
     } except e { return false }
     if absolute == cwd { return true }
     return starts_with(absolute, cwd + "/")

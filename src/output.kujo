@@ -75,7 +75,7 @@ func within_cwd(p) {
     } except e {
         return false
     }
-    let cwd = normalize_sep(os_getcwd())
+    let cwd = normalize_sep(path_absolute("."))
     if abs == cwd {
         return true
     }

@@ -70,7 +70,7 @@ func existing_config_within_cwd(path) {
     mut cwd = ""
     try {
         absolute = normalize_sep(path_absolute(path))
-        cwd = normalize_sep(os_getcwd())
+        cwd = normalize_sep(path_absolute("."))
     } except e { return false }
     if absolute == cwd { return true }
     return starts_with(absolute, cwd + "/")
