@@ -14,6 +14,20 @@ from src.paths import file_ext
 //
 // Returns a sorted array of paths (deterministic order).
 export func walk(source_roots, include_patterns, exclude_patterns) {
+    return filter_files(collect_files(source_roots), include_patterns, exclude_patterns)
+}
+
+export func walk_profile(source_roots, include_patterns, exclude_patterns) {
+    let traversal_started = performance_now()
+    let discovered = collect_files(source_roots)
+    let traversal_ms = performance_now() - traversal_started
+    let filter_started = performance_now()
+    let files = filter_files(discovered, include_patterns, exclude_patterns)
+    let filter_ms = performance_now() - filter_started
+    return { "files": files, "discovered": len(discovered), "traversal_ms": traversal_ms, "filter_ms": filter_ms }
+}
+
+func collect_files(source_roots) {
     mut found = []
 
     // Seed the stack with existing source roots.
@@ -60,7 +74,7 @@ export func walk(source_roots, include_patterns, exclude_patterns) {
         }
     }
 
-    return filter_files(found, include_patterns, exclude_patterns)
+    return found
 }
 
 // Apply include/exclude filtering to a flat file list.

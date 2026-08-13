@@ -2,8 +2,8 @@
 // paths. The generated repository lives in a UUID-scoped /tmp directory and is
 // removed after each run.
 
-from src.walk import walk
-from src.analyze import analyze_files
+from src.walk import walk_profile
+from src.analyze import analyze_sharded
 from src.config import normalize_config
 
 func fail(message) {
@@ -39,19 +39,24 @@ func benchmark_config(root) {
 }
 
 mut file_count = 1600
+mut shard_count = 1
 let argv = args()
 mut ai = 0
 while ai < len(argv) {
     if argv[ai] == "--files" && ai + 1 < len(argv) {
         file_count = to_int(argv[ai + 1])
         ai = ai + 2
+    } else if argv[ai] == "--shards" && ai + 1 < len(argv) {
+        shard_count = to_int(argv[ai + 1])
+        ai = ai + 2
     } else {
-        fail("usage: kujo run benchmarks/fence_benchmark.kujo -- [--files COUNT]")
+        fail("usage: kujo run benchmarks/fence_benchmark.kujo -- [--files COUNT] [--shards COUNT]")
     }
 }
 if file_count < 1 || file_count > 20000 {
     fail("--files must be between 1 and 20000")
 }
+if shard_count < 1 || shard_count > 32 { fail("--shards must be between 1 and 32") }
 
 let root = "/tmp/fence-benchmark-" + uuid_v4()
 let src_root = root + "/src"
@@ -82,22 +87,25 @@ generated = push(generated, target_path)
 let generation_ms = performance_now() - generation_started
 
 let cfg = benchmark_config(root)
-let walk_started = performance_now()
-let files = walk(cfg["source_roots"], cfg["include"], cfg["exclude"])
-let walk_ms = performance_now() - walk_started
+let walked = walk_profile(cfg["source_roots"], cfg["include"], cfg["exclude"])
+let files = walked["files"]
+let walk_ms = walked["traversal_ms"] + walked["filter_ms"]
 let analyze_started = performance_now()
-let result = analyze_files(files, cfg)
+let result = analyze_sharded(files, cfg, shard_count)
 let analyze_ms = performance_now() - analyze_started
 
 print(to_json_pretty({
     "schema": "fence.benchmark/v1",
     "engine": "kujo",
     "requested_files": file_count,
+    "shards": shard_count,
     "files_scanned": result["files_scanned"],
     "imports_checked": result["imports_checked"],
     "violations": len(result["violations"]),
     "generation_ms": generation_ms,
     "walk_ms": walk_ms,
+    "traversal_ms": walked["traversal_ms"],
+    "filter_ms": walked["filter_ms"],
     "analyze_ms": analyze_ms,
     "total_scan_ms": walk_ms + analyze_ms,
     "metrics": result["metrics"]

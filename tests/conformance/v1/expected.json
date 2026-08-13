@@ -1,0 +1,11 @@
+{
+  "schema": "fence.language-conformance/v1",
+  "cases": [
+    {"language":"kujo","file":"kujo.kujo","extension":".kujo","count":2,"first_path":"real.module"},
+    {"language":"python","file":"python.py","extension":".py","count":2,"first_path":"real.module"},
+    {"language":"javascript-typescript","file":"javascript.ts","extension":".ts","count":2,"first_path":"./real"},
+    {"language":"rust","file":"rust.rs","extension":".rs","count":3,"first_path":"crate::real::Item"},
+    {"language":"php","file":"php.php","extension":".php","count":3,"first_path":"App\\Real\\Item"},
+    {"language":"go","file":"go.go","extension":".go","count":2,"first_path":"fmt"}
+  ]
+}

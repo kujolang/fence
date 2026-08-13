@@ -14,10 +14,11 @@ from src.cmd_explain import cmd_explain
 from src.cmd_graph import cmd_graph
 from src.cmd_baseline import cmd_baseline
 from src.cmd_workspace import cmd_workspace
+from src.cmd_ignores import cmd_ignores
 
 // Flags that always consume the following token as their value.
 func value_flags() {
-    return ["template", "format", "output", "fail-on", "base"]
+    return ["template", "format", "output", "fail-on", "base", "within-days"]
 }
 
 export func cli_dispatch(argv) {
@@ -75,6 +76,7 @@ export func cli_dispatch(argv) {
     if cmd == "workspace" {
         return cmd_workspace(parsed)
     }
+    if cmd == "ignores" { return cmd_ignores(parsed) }
 
     print("Unknown command: " + cmd)
     print("Run `kujo run fence.kujo -- help` for usage.")

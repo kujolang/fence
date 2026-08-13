@@ -78,6 +78,7 @@ export func validate_config(cfg) {
     out = validate_limits(cfg, out)
     out = validate_output_roots(cfg["output_roots"], out)
     out = validate_ignores(cfg["ignores"], out)
+    out = validate_parser_adapters(cfg["parser_adapters"], out)
 
     // Config schema version guard.
     if to_string(cfg["version"]) != "1" {
@@ -96,6 +97,35 @@ export func validate_config(cfg) {
         out = push(out, diag("warning", "dependency cycle in allowed edges: " + join_strings(cyc, " -> ")))
     }
 
+    return out
+}
+
+func validate_parser_adapters(adapters, acc) {
+    mut out = acc
+    if type_of(adapters) != "dict" {
+        return push(out, diag("error", "parser_adapters must be a table keyed by file extension"))
+    }
+    let exts = keys(adapters)
+    let n = len(exts)
+    mut i = 0
+    while i < n {
+        let ext = exts[i]
+        let argv = adapters[ext]
+        if starts_with(ext, ".") == false || type_of(argv) != "array" || len(argv) == 0 {
+            out = push(out, diag("error", "parser_adapters." + ext + " must be a non-empty argv array and the key must start with '.'"))
+        } else {
+            let an = len(argv)
+            mut j = 0
+            while j < an {
+                if type_of(argv[j]) != "string" || argv[j] == "" {
+                    out = push(out, diag("error", "parser_adapters." + ext + " argv entries must be non-empty strings"))
+                    j = an
+                }
+                j = j + 1
+            }
+        }
+        i = i + 1
+    }
     return out
 }
 
@@ -245,6 +275,9 @@ func validate_zones(zones, zone_names, acc) {
         // severity valid?
         if valid_severity(z["severity"]) == false {
             out = push(out, diag("error", "zone '" + name + "' has invalid severity '" + to_string(z["severity"]) + "'"))
+        }
+        if type_of(z["owner"]) != "string" {
+            out = push(out, diag("error", "zone '" + name + "' owner must be a string"))
         }
 
         // referenced zones exist + no conflicts.

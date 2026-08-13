@@ -24,3 +24,31 @@ func field_match(pattern, value) {
     if pattern == "*" { return true }
     return pattern == value
 }
+
+export func audit_ignores(entries, within_days, now_seconds) {
+    mut active = []
+    mut expiring = []
+    mut expired = []
+    let today_start = parse_date(format_date(now_seconds, "YYYY-MM-DD"), "YYYY-MM-DD")
+    let cutoff = today_start + (within_days * 86400)
+    let n = len(entries)
+    mut i = 0
+    while i < n {
+        let entry = entries[i]
+        let expiry = parse_date(dict_get(entry, "expires", "1970-01-01"), "YYYY-MM-DD")
+        let row = {
+            "index": i + 1,
+            "expires": dict_get(entry, "expires", ""),
+            "reason": dict_get(entry, "reason", ""),
+            "from_zone": dict_get(entry, "from_zone", "*"),
+            "to_zone": dict_get(entry, "to_zone", "*"),
+            "file": dict_get(entry, "file", "**"),
+            "import": dict_get(entry, "import", "*")
+        }
+        if expiry < today_start { expired = push(expired, row) }
+        else if expiry <= cutoff { expiring = push(expiring, row) }
+        else { active = push(active, row) }
+        i = i + 1
+    }
+    return { "schema_version": 1, "within_days": within_days, "active": active, "expiring": expiring, "expired": expired }
+}

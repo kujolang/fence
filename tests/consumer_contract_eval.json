@@ -1,0 +1,23 @@
+{
+  "name": "fence-consumer-contracts",
+  "description": "Validates Fence JSON v1 and SARIF 2.1.0 fixtures through Kujo Eval.",
+  "version": "1.0.0",
+  "stop_on_failure": false,
+  "tests": [
+    {
+      "name": "Fence JSON contract has schema v1",
+      "check": "json_value_equals",
+      "params": {"path":"./.fence-contract-tmp/check-v1.json","json_path":"schema_version","expected":1}
+    },
+    {
+      "name": "Fence JSON contract reports failed fixture",
+      "check": "json_value_equals",
+      "params": {"path":"./.fence-contract-tmp/check-v1.json","json_path":"status","expected":"failed"}
+    },
+    {
+      "name": "Fence SARIF contract is 2.1.0",
+      "check": "json_value_equals",
+      "params": {"path":"./.fence-contract-tmp/sarif-v2.1.0.json","json_path":"version","expected":"2.1.0"}
+    }
+  ]
+}

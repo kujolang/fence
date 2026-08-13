@@ -5,7 +5,7 @@
 // These languages are SCANNED targets only. Fence itself is written in Kujo.
 
 func rec(kind, path, raw, line) {
-    return { "kind": kind, "path": path, "raw": raw, "line": line }
+    return { "kind": kind, "path": path, "raw": raw, "line": line, "confidence": "best_effort", "detector": "builtin" }
 }
 
 func to_lines(content) {

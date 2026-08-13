@@ -6,6 +6,13 @@
     "results": [{
       "ruleId": "fence.boundary-violation",
       "level": "error",
+      "properties": {
+        "confidence": "best_effort",
+        "fromZone": "ui",
+        "toZone": "database",
+        "fromOwner": "team-ui",
+        "toOwner": "team-data"
+      },
       "locations": [{
         "physicalLocation": {
           "artifactLocation": { "uri": "src/ui/Login.ts" },

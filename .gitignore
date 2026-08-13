@@ -85,6 +85,7 @@
 /agent/
 /FENCE_REPORT.md
 /fence.sarif
+/.fence/
 /architecture.mmd
 /architecture.dot
 

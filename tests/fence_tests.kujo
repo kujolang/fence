@@ -13,7 +13,7 @@
 from src.glob import glob_match, glob_match_any
 from src.paths import is_safe_output, file_ext, parent_dir, base_name
 from src.util import arr_has, sort_strings, join_strings, truthy, utf8_byte_length
-from src.config import normalize_config
+from src.config import normalize_config, load_composed
 from src.validate import validate_config, count_errors
 from src.imports import extract_for_ext, detect_imports_result
 from src.resolve import resolve_import, resolve_import_with_go
@@ -25,7 +25,7 @@ from src.cliargs import parse_args, flag_or, has_flag
 from src.git import valid_ref
 from src.cycles import one_cycle, cycle_nodes
 from src.templates import template_by_name
-from src.analyze import analyze_files
+from src.analyze import analyze_files, analyze_sharded
 from src.baseline import fingerprint, baseline_from_result, apply_baseline, prune_baseline
 from src.rules import check_external
 from src.reports import render_human, render_markdown
@@ -35,7 +35,8 @@ from src.meta import no_config_text
 from src.output import output_root_allowed
 from src.walk import include_extensions
 from src.graph import render_observed_graph
-from src.ignores import ignore_match
+from src.ignores import ignore_match, audit_ignores
+from src.parser_adapters import run_adapter
 
 mut g_pass = 0
 mut g_fail = 0
@@ -225,6 +226,15 @@ let ignored = ignore_match(fake_result["violations"][0], [{ "from_zone": "ui", "
 ok("structured ignore match", ignored["ignored"])
 let expired_ignore = ignore_match(fake_result["violations"][0], [{ "reason": "old", "expires": "2000-01-01" }])
 ok("expired ignore inactive", expired_ignore["ignored"] == false)
+let audit_now = parse_date("2026-08-12", "YYYY-MM-DD")
+let audit = audit_ignores([
+    { "reason": "expired", "expires": "2026-08-11" },
+    { "reason": "soon", "expires": "2026-08-20" },
+    { "reason": "later", "expires": "2027-01-01" }
+], 30, audit_now)
+eq("ignore audit expired", len(audit["expired"]), 1)
+eq("ignore audit expiring", len(audit["expiring"]), 1)
+eq("ignore audit active", len(audit["active"]), 1)
 ok("unreadable file diagnostic", detect_imports_result("tests/fixtures/missing.ts")["ok"] == false)
 eq("utf8 byte limit accounting", utf8_byte_length("犬"), 3)
 
@@ -332,6 +342,45 @@ eq("alias unknown target", resolve_import("@/nope/missing", "tests/fixtures/samp
 // ---- D5: determinism (same input -> byte-identical JSON) ----
 eq("json deterministic", render_json(fake_result, summary, "fence.toml"), render_json(fake_result, summary, "fence.toml"))
 eq("sarif deterministic", render_sarif(fake_result, summary, "fence.toml"), render_sarif(fake_result, summary, "fence.toml"))
+
+// ---- session 2: parser fidelity and confidence ----
+let conformance = parse_json(read_file("tests/conformance/v1/expected.json"))
+let corpus = conformance["cases"]
+mut corpus_i = 0
+mut corpus_case = {}
+mut corpus_extracted = []
+while corpus_i < len(corpus) {
+    corpus_case = corpus[corpus_i]
+    corpus_extracted = extract_for_ext(corpus_case["extension"], read_file("tests/conformance/v1/" + corpus_case["file"]))
+    eq("conformance " + corpus_case["language"] + " count", len(corpus_extracted), corpus_case["count"])
+    if corpus_case["count"] > 0 { eq("conformance " + corpus_case["language"] + " first path", corpus_extracted[0]["path"], corpus_case["first_path"]) }
+    corpus_i = corpus_i + 1
+}
+let adapter = run_adapter("tests/conformance/v1/javascript.ts", ["kujo", "run", "tests/fixtures/parser_adapter.kujo", "--"])
+ok("parser adapter succeeds", adapter["ok"])
+eq("parser adapter exact confidence", adapter["imports"][0]["confidence"], "exact")
+eq("builtin best effort confidence", extract_for_ext(".ts", "import x from './x'")[0]["confidence"], "best_effort")
+let bad_adapter_cfg = normalize_config({ "version": 1, "source_roots": ["src"], "parser_adapters": { "ts": [] }, "zones": { "all": { "paths": ["src/**"] } } })
+ok("invalid parser adapter rejected", count_errors(validate_config(bad_adapter_cfg)) > 0)
+
+// ---- session 2: deterministic sharding, ownership, composition ----
+let shard_one = analyze_files(walked, cfg)
+let shard_two = analyze_sharded(walked, cfg, 2)
+eq("sharded violations deterministic", to_json(shard_two["violations"]), to_json(shard_one["violations"]))
+eq("sharded file count", shard_two["files_scanned"], shard_one["files_scanned"])
+let owned_cfg = normalize_config({ "version": 1, "source_roots": roots, "aliases": aliases, "unknown_dependency_policy": "deny", "zones": {
+    "ui": { "paths": ["tests/fixtures/sample/src/ui/**"], "cannot_depend_on": ["database"], "owner": "team-ui" },
+    "database": { "paths": ["tests/fixtures/sample/src/database/**"], "owner": "team-data" }
+} })
+let owned_result = analyze_files(["tests/fixtures/sample/src/ui/Login.tsx"], owned_cfg)
+eq("violation source owner", owned_result["violations"][0]["from_owner"], "team-ui")
+eq("violation target owner", owned_result["violations"][0]["to_owner"], "team-data")
+let composed = load_composed("tests/config_composition/child.toml", [], 0)
+ok("config composition loads", composed["ok"])
+ok("config composition inherits zone", has_key(composed["raw"]["zones"], "base"))
+ok("config composition child overrides", has_key(composed["raw"]["zones"], "child"))
+ok("config composition cycle rejected", load_composed("tests/config_composition/cycle-a.toml", [], 0)["ok"] == false)
+ok("config composition path escape rejected", load_composed("tests/config_composition/escape.toml", [], 0)["ok"] == false)
 
 // ---- summary ----
 print("")

@@ -1,0 +1,3 @@
+extends = ["cycle-b.toml"]
+[zones.a]
+paths = ["a/**"]

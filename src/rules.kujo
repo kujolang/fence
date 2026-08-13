@@ -110,13 +110,16 @@ func concat_lists(a, b) {
 }
 
 // Build a violation record for a denied external dependency.
-export func make_external_violation(severity, from_zone, file, import_str, line, rule) {
+export func make_external_violation(severity, from_zone, file, import_str, line, rule, confidence, from_owner) {
     return {
         "severity": severity,
         "from_zone": from_zone,
         "to_zone": "external",
+        "from_owner": from_owner,
+        "to_owner": "",
         "file": file,
         "line": line,
+        "confidence": confidence,
         "import": import_str,
         "resolved": "",
         "rule": rule,
@@ -149,13 +152,16 @@ export func suggest(from_zone, to_zone) {
 }
 
 // Build a full violation record for reporting.
-export func make_violation(severity, from_zone, to_zone, file, import_str, line, resolved, rule) {
+export func make_violation(severity, from_zone, to_zone, file, import_str, line, resolved, rule, confidence, from_owner, to_owner) {
     return {
         "severity": severity,
         "from_zone": from_zone,
         "to_zone": to_zone,
+        "from_owner": from_owner,
+        "to_owner": to_owner,
         "file": file,
         "line": line,
+        "confidence": confidence,
         "import": import_str,
         "resolved": resolved,
         "rule": rule,

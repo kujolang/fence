@@ -108,6 +108,33 @@ A="$("$KUJO" run "$FENCE" -- check --format json 2>/dev/null)"
 B="$("$KUJO" run "$FENCE" -- check --format json 2>/dev/null)"
 if [ "$A" = "$B" ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: json output is deterministic"; fi
 
+# Incremental cache: warm output is identical and a source change invalidates it.
+C="$("$KUJO" run "$FENCE" -- check --cache --format json 2>/dev/null)"
+D="$("$KUJO" run "$FENCE" -- check --cache --format json 2>/dev/null)"
+if [ "$C" = "$D" ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: cache warm output is deterministic"; fi
+printf 'import { z } from "../database/new-target"\n' >> src/ui/Bad.tsx
+printf 'export const z = 1\n' > src/database/new-target.ts
+E="$("$KUJO" run "$FENCE" -- check --cache --format json 2>/dev/null)"
+if [ "$D" != "$E" ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: cache invalidates changed source"; fi
+
+# Governed exception inventory and CI expiry gate.
+cat >> fence.toml <<'EOF'
+
+[[ignores]]
+from_zone = "ui"
+to_zone = "database"
+reason = "temporary migration"
+expires = "2999-01-01"
+
+[[ignores]]
+from_zone = "ui"
+to_zone = "database"
+reason = "expired migration"
+expires = "2000-01-01"
+EOF
+expect_exit 0 "$(run ignores list --format json)" "ignores list"
+expect_exit 1 "$(run ignores check)" "ignores check fails expired"
+
 echo ""
 echo "CLI smoke: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] || exit 1

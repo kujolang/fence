@@ -13,6 +13,7 @@ from src.glob import glob_match
 from src.baseline import load_baseline, apply_baseline
 from src.meta import no_config_text
 from src.util import utf8_byte_length
+from src.cache import load_cache, save_cache
 
 export func cmd_check(parsed) {
     let flags = parsed["flags"]
@@ -35,6 +36,10 @@ export func cmd_check(parsed) {
     if has_flag(flags, "fail-on") {
         cfg["fail_on"] = fail_override
     }
+    if has_flag(flags, "cache") {
+        cfg["use_cache"] = true
+        cfg["import_cache"] = load_cache(cfg["parser_adapters"])
+    }
 
     let diags = validate_config(cfg)
     if count_errors(diags) > 0 {
@@ -55,6 +60,10 @@ export func cmd_check(parsed) {
     }
 
     mut result = analyze_files(files, cfg)
+    if cfg["use_cache"] {
+        let saved_cache = save_cache(result["import_cache"])
+        if saved_cache["ok"] == false { print("Error: " + saved_cache["error"]); return 5 }
+    }
     if cfg["max_imports"] > 0 && result["imports_checked"] > cfg["max_imports"] {
         print("Error: resource limit exceeded: " + to_string(result["imports_checked"]) + " imports checked, limit is " + to_string(cfg["max_imports"]))
         return 4

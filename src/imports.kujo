@@ -11,9 +11,10 @@
 
 from src.paths import file_ext
 from src.imports_ext import extract_rust, extract_php, extract_go
+from src.parser_adapters import adapter_for, run_adapter
 
 func rec(kind, path, raw, line) {
-    return { "kind": kind, "path": path, "raw": raw, "line": line }
+    return { "kind": kind, "path": path, "raw": raw, "line": line, "confidence": "best_effort", "detector": "builtin" }
 }
 
 // Split content into lines (handles \n; \r is trimmed per-line).
@@ -259,13 +260,19 @@ export func detect_imports(file_path) {
 }
 
 export func detect_imports_result(file_path) {
+    return detect_imports_with_adapters(file_path, {})
+}
+
+export func detect_imports_with_adapters(file_path, adapters) {
+    let adapter = adapter_for(file_path, adapters)
+    if len(adapter) > 0 { return run_adapter(file_path, adapter) }
     mut content = ""
     try {
         content = read_file(file_path)
     } except e {
-        return { "ok": false, "imports": [], "error": "unreadable source file", "file": file_path }
+        return { "ok": false, "imports": [], "error": "unreadable source file", "file": file_path, "detector": "builtin" }
     }
-    return { "ok": true, "imports": extract_for_ext(file_ext(file_path), content), "error": "", "file": file_path }
+    return { "ok": true, "imports": extract_for_ext(file_ext(file_path), content), "error": "", "file": file_path, "detector": "builtin" }
 }
 
 // Separated so it can be unit-tested without touching the filesystem.

@@ -4,13 +4,14 @@
 // Loop variables here use unique names (fi/fc, mi/mc) so that callee helpers
 // (which use plain i/n internally) cannot alias and corrupt the loop counters.
 
-from src.imports import detect_imports_result
+from src.imports import detect_imports_with_adapters
 from src.resolve import resolve_import_with_go
 from src.zones import match_zone
 from src.rules import check_dependency, make_violation, check_external, make_external_violation
 from src.util import dict_get, dict_has, arr_has
 from src.paths import file_ext
 from src.ignores import ignore_match
+from src.cache import cached_imports
 
 // Analyze a list of files against the config. Returns:
 //   {
@@ -37,6 +38,9 @@ export func analyze_files(files, cfg) {
     mut resolution_misses = 0
     mut zone_hits = 0
     mut zone_misses = 0
+    mut import_cache = cfg["import_cache"]
+    mut import_cache_hits = 0
+    mut import_cache_misses = 0
 
     let fc = len(files)
     mut fi = 0
@@ -52,7 +56,15 @@ export func analyze_files(files, cfg) {
         }
         zone_files = bump(zone_files, file_zone)
 
-        let detected = detect_imports_result(file)
+        mut detected = {}
+        if cfg["use_cache"] {
+            let cached = cached_imports(file, cfg["parser_adapters"], import_cache)
+            detected = cached["result"]
+            import_cache = cached["cache"]
+            if cached["hit"] { import_cache_hits = import_cache_hits + 1 } else { import_cache_misses = import_cache_misses + 1 }
+        } else {
+            detected = detect_imports_with_adapters(file, cfg["parser_adapters"])
+        }
         let imps = detected["imports"]
         if detected["ok"] == false {
             skipped_files = push(skipped_files, { "file": file, "reason": detected["error"] })
@@ -114,13 +126,81 @@ export func analyze_files(files, cfg) {
         "skipped_files": skipped_files,
         "observed_edges": observed_edges,
         "ignored_violations": ignored_violations,
+        "import_cache": import_cache,
         "metrics": {
             "resolution_cache_hits": resolution_hits,
             "resolution_cache_misses": resolution_misses,
             "zone_cache_hits": zone_hits,
-            "zone_cache_misses": zone_misses
+            "zone_cache_misses": zone_misses,
+            "import_cache_hits": import_cache_hits,
+            "import_cache_misses": import_cache_misses
         }
     }
+}
+
+// Deterministic contiguous sharding. This is intentionally sequential because
+// the current Kujo process primitive waits synchronously; it establishes merge
+// semantics for future native concurrency without shell/background execution.
+export func analyze_sharded(files, cfg, shard_count) {
+    if shard_count <= 1 { return analyze_files(files, cfg) }
+    mut combined = empty_result()
+    let total = len(files)
+    let width = ceil(total / shard_count)
+    mut offset = 0
+    while offset < total {
+        let end = min(offset + width, total)
+        let part = analyze_files(slice(files, offset, end), cfg)
+        combined = merge_results(combined, part)
+        offset = end
+    }
+    return combined
+}
+
+func empty_result() {
+    return {
+        "files_scanned": 0, "imports_checked": 0, "violations": [],
+        "zone_files": {}, "skipped_files": [], "observed_edges": [],
+        "ignored_violations": [], "import_cache": {},
+        "metrics": { "resolution_cache_hits": 0, "resolution_cache_misses": 0, "zone_cache_hits": 0, "zone_cache_misses": 0, "import_cache_hits": 0, "import_cache_misses": 0 }
+    }
+}
+
+export func merge_results(left, right) {
+    return {
+        "files_scanned": left["files_scanned"] + right["files_scanned"],
+        "imports_checked": left["imports_checked"] + right["imports_checked"],
+        "violations": concat(left["violations"], right["violations"]),
+        "zone_files": merge_counts(left["zone_files"], right["zone_files"]),
+        "skipped_files": concat(left["skipped_files"], right["skipped_files"]),
+        "observed_edges": merge_unique(left["observed_edges"], right["observed_edges"]),
+        "ignored_violations": concat(left["ignored_violations"], right["ignored_violations"]),
+        "import_cache": right["import_cache"],
+        "metrics": merge_counts(left["metrics"], right["metrics"])
+    }
+}
+
+func merge_counts(left, right) {
+    mut out = left
+    let names = keys(right)
+    let n = len(names)
+    mut i = 0
+    while i < n {
+        let name = names[i]
+        out[name] = dict_get(out, name, 0) + right[name]
+        i = i + 1
+    }
+    return out
+}
+
+func merge_unique(left, right) {
+    mut out = left
+    let n = len(right)
+    mut i = 0
+    while i < n {
+        if arr_has(out, right[i]) == false { out = push(out, right[i]) }
+        i = i + 1
+    }
+    return out
 }
 
 // Evaluate one resolved import. Returns a violation record, or 0 when allowed
@@ -134,7 +214,7 @@ func judge(file, file_zone, imp, res, to_zone, cfg) {
         if ev["allowed"] {
             return {}
         }
-        return make_external_violation(ev["severity"], file_zone, file, imp["path"], imp["line"], ev["rule"])
+        return make_external_violation(ev["severity"], file_zone, file, imp["path"], imp["line"], ev["rule"], dict_get(imp, "confidence", "best_effort"), zone_owner(cfg, file_zone))
     }
 
     let verdict = check_dependency(file_zone, to_zone, cfg)
@@ -142,7 +222,12 @@ func judge(file, file_zone, imp, res, to_zone, cfg) {
         return {}
     }
 
-    return make_violation(verdict["severity"], file_zone, to_zone, file, imp["path"], imp["line"], res["resolved"], verdict["rule"])
+    return make_violation(verdict["severity"], file_zone, to_zone, file, imp["path"], imp["line"], res["resolved"], verdict["rule"], dict_get(imp, "confidence", "best_effort"), zone_owner(cfg, file_zone), zone_owner(cfg, to_zone))
+}
+
+func zone_owner(cfg, zone) {
+    if dict_has(cfg["zones"], zone) { return dict_get(cfg["zones"][zone], "owner", "") }
+    return ""
 }
 
 // Relative and Rust module imports depend on the importing file. Other imports

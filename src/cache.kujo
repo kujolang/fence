@@ -1,0 +1,72 @@
+// Content-digest import cache. Cold analysis remains authoritative; entries are
+// accepted only when schema, extractor version, adapter fingerprint, and source
+// digest all match.
+
+from src.util import dict_has, dict_get
+from src.imports import detect_imports_with_adapters
+from src.output import write_safe
+from src.paths import normalize_sep
+
+func cache_path() { return ".fence/cache-v1.json" }
+
+export func empty_cache(adapters) {
+    return {
+        "schema_version": 1,
+        "extractor_version": 2,
+        "adapter_fingerprint": sha256(to_json(adapters)),
+        "entries": {}
+    }
+}
+
+export func load_cache(adapters) {
+    let fresh = empty_cache(adapters)
+    if cache_directory_safe() == false { return fresh }
+    if file_exists(cache_path()) == false { return fresh }
+    mut parsed = {}
+    try { parsed = parse_json(read_file(cache_path())) } except e { return fresh }
+    if type_of(parsed) != "dict" { return fresh }
+    if dict_get(parsed, "schema_version", 0) != 1 { return fresh }
+    if dict_get(parsed, "extractor_version", 0) != 2 { return fresh }
+    if dict_get(parsed, "adapter_fingerprint", "") != fresh["adapter_fingerprint"] { return fresh }
+    if type_of(dict_get(parsed, "entries", 0)) != "dict" { return fresh }
+    return parsed
+}
+
+export func cached_imports(file, adapters, cache) {
+    mut digest = ""
+    try { digest = sha256_file(file) } except e {
+        let failed = detect_imports_with_adapters(file, adapters)
+        return { "result": failed, "cache": cache, "hit": false }
+    }
+    mut entries = cache["entries"]
+    if dict_has(entries, file) {
+        let entry = entries[file]
+        if dict_get(entry, "sha256", "") == digest && type_of(dict_get(entry, "imports", 0)) == "array" {
+            return { "result": { "ok": true, "imports": entry["imports"], "error": "", "file": file, "detector": "cache" }, "cache": cache, "hit": true }
+        }
+    }
+    let detected = detect_imports_with_adapters(file, adapters)
+    if detected["ok"] {
+        entries[file] = { "sha256": digest, "imports": detected["imports"] }
+        cache["entries"] = entries
+    }
+    return { "result": detected, "cache": cache, "hit": false }
+}
+
+export func save_cache(cache) {
+    let written = write_safe(cache_path(), to_json_pretty(cache), true)
+    if written["ok"] == false { return { "ok": false, "error": written["error"], "path": cache_path() } }
+    return { "ok": true, "error": "", "path": cache_path() }
+}
+
+func cache_directory_safe() {
+    if path_exists(".fence") == false { return true }
+    mut absolute = ""
+    mut cwd = ""
+    try {
+        absolute = normalize_sep(path_absolute(".fence"))
+        cwd = normalize_sep(os_getcwd())
+    } except e { return false }
+    if absolute == cwd { return true }
+    return starts_with(absolute, cwd + "/")
+}

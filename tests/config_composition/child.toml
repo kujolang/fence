@@ -1,0 +1,4 @@
+extends = ["base.toml"]
+
+[zones.child]
+paths = ["src/child/**"]

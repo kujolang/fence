@@ -160,6 +160,7 @@ func human_violations(viols) {
         let v = viols[i]
         o = o + "[" + to_upper(v["severity"]) + "] " + v["from_zone"] + " -> " + v["to_zone"] + " is not allowed\n"
         o = o + "  File: " + v["file"] + ":" + to_string(dict_get(v, "line", 1)) + "\n"
+        if dict_get(v, "from_owner", "") != "" { o = o + "  Owner: " + v["from_owner"] + "\n" }
         o = o + "  Import: " + v["import"] + "\n"
         if v["resolved"] != "" {
             o = o + "  Resolved: " + v["resolved"] + "\n"
@@ -280,6 +281,13 @@ func sarif_results(viols) {
             "ruleId": "fence.boundary-violation",
             "level": sarif_level(v["severity"]),
             "message": { "text": v["message"] + " (" + v["rule"] + "). " + v["suggestion"] },
+            "properties": {
+                "confidence": dict_get(v, "confidence", "best_effort"),
+                "fromZone": v["from_zone"],
+                "toZone": v["to_zone"],
+                "fromOwner": dict_get(v, "from_owner", ""),
+                "toOwner": dict_get(v, "to_owner", "")
+            },
             "locations": [
                 {
                     "physicalLocation": {

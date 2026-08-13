@@ -1,0 +1,6 @@
+let argv = args()
+if len(argv) == 0 { exit(2) }
+print(to_json({
+    "schema": "fence.parser-adapter/v1",
+    "imports": [{ "kind": "import", "path": "./adapter-target", "raw": "adapter", "line": 1 }]
+}))
