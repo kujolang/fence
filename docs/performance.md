@@ -40,28 +40,48 @@ with `files × imports`, i.e. ~40–55 ms per file on this machine.
   importer path in the key so context-dependent resolution stays correct.
 - Zone classification is memoized by normalized repository path for both source
   files and resolved targets.
-- Both caches are process-local, deterministic, and discarded after each check.
+- `check --cache` adds an opt-in persistent import cache keyed by source SHA-256,
+  extractor schema, and parser-adapter fingerprint. A miss always executes the
+  source extractor; warm and cold reports are byte-identical.
 
 ## Kujo-native benchmark harness
 
 Run the checked-in generator and benchmark without Python:
 
 ```bash
-kujo run benchmarks/fence_benchmark.kujo -- --files 1600
+kujo run benchmarks/fence_benchmark.kujo -- --files 1600 --shards 1
+kujo run benchmarks/fence_benchmark.kujo -- --files 1600 --shards 4
 kujo run benchmarks/fence_benchmark.kujo -- --files 10000
 ```
 
 Measured on the August 12, 2026 development machine after cache and walk
 fast-path hardening:
 
-| Requested files | Walk | Analyze | Total scan | Resolution hits/misses | Zone hits/misses |
+| Requested files | Shards | Traverse | Filter | Analyze | Total scan |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1,600 | 10.8 s | 30.1 s | 40.8 s | 1,599 / 1 | 1,600 / 1,601 |
-| 10,000 | 155.0 s | 292.3 s | 447.3 s | 9,999 / 1 | 10,000 / 10,001 |
+| 1,600 | 1 | 0.58 s | 12.70 s | 48.12 s | 61.41 s |
+| 1,600 | 4 | 0.55 s | 13.05 s | 49.27 s | 62.86 s |
+| 10,000 | 1 | 23.87 s | 63.96 s | 302.39 s | 390.23 s |
 
 The harness adds one shared target file, so `files_scanned` is requested files
 plus one. Timings are comparative developer-machine evidence, not a universal
-service-level guarantee. Both runs completed without stack overflow or failure.
+service-level guarantee. All runs completed without stack overflow or failure.
+
+The profile now separates directory traversal from glob filtering. At 10,000
+files, filtering is 2.7× traversal, so glob evaluation—not filesystem walking—is
+the next walk-stage optimization target.
+
+## Parallel-analysis research result
+
+Kujo's current supported process primitive is synchronous: `spawn_process`
+waits for completion and there is no native task/future primitive exposed to
+Fence. Fence therefore implements deterministic contiguous sharding and merge
+semantics without unsafe shell backgrounding, but runs shards sequentially.
+Four shards were 2.4% slower at 1,600 files and lost cache reuse across shard
+boundaries. A 10,000-file baseline was recorded; a sharded 10,000 run cannot
+produce a concurrency win with the current runtime and would only repeat that
+known sequential overhead. Native parallel execution remains deferred until
+Kujo exposes a supported concurrency primitive.
 
 ## Notes for optimizers
 

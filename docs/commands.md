@@ -32,6 +32,7 @@ kujo run fence.kujo -- check --format sarif --output fence.sarif
 kujo run fence.kujo -- check --fail-on warning
 kujo run fence.kujo -- check --changed-only --base origin/main
 kujo run fence.kujo -- check --baseline
+kujo run fence.kujo -- check --cache
 kujo run fence.kujo -- check --quiet
 ```
 
@@ -43,6 +44,7 @@ kujo run fence.kujo -- check --quiet
 | `--changed-only` | Only scan files changed vs a Git base |
 | `--base <ref>` | Git base ref for `--changed-only` (default `HEAD`) |
 | `--baseline` | Suppress violations recorded in `fence-baseline.json` |
+| `--cache` | Reuse content-digest import extraction under `.fence/cache-v1.json` |
 | `--quiet` | Print only a one-line status |
 | `--summary-only` | Print only the summary line (no violation list) |
 | `--no-color` | Accepted for CI compatibility (output is already plain) |
@@ -104,6 +106,20 @@ in a full current scan and prints removed/remaining counts.
 `kujo run fence.kujo -- workspace init` discovers direct children of `apps/`
 and `packages/` with common local manifests and generates one deterministic zone
 per package. It refuses to overwrite an existing `fence.toml`.
+
+## `ignores list` / `ignores check`
+
+Audit structured exceptions without running a source scan.
+
+```bash
+kujo run fence.kujo -- ignores list --within-days 30
+kujo run fence.kujo -- ignores check --format json
+kujo run fence.kujo -- ignores check --fail-expiring
+```
+
+`list` is informational. `check` exits `1` when any exception is expired;
+`--fail-expiring` also fails exceptions within the selected review window.
+`--within-days` accepts `0..3650` and defaults to `30`.
 
 ## `validate`
 

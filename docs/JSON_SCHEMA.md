@@ -41,6 +41,9 @@ warn on values they do not recognize.
       "severity": "error" | "warning" | "info",
       "from_zone": "ui",
       "to_zone": "database",
+      "from_owner": "team-ui",
+      "to_owner": "team-data",
+      "confidence": "best_effort",
       "file": "src/ui/LoginForm.tsx",
       "line": 12,
       "import": "../database/users",
@@ -82,6 +85,9 @@ warn on values they do not recognize.
 | `severity` | string | `error`, `warning`, or `info`. |
 | `from_zone` | string | Zone of the importing file. |
 | `to_zone` | string | Target zone, or `unknown` when unmappable. |
+| `from_owner` | string | Optional source-zone owner identifier, otherwise `""`. |
+| `to_owner` | string | Optional target-zone owner identifier, otherwise `""`. |
+| `confidence` | string | `best_effort` for built-ins or `exact` for parser adapters. |
 | `file` | string | Repo-relative path of the importing file. |
 | `line` | int | One-based line containing the detected import. |
 | `import` | string | The import string exactly as written. |
@@ -105,6 +111,7 @@ debt remains auditable.
   should ignore unknown fields. Removing or renaming a field bumps
   `schema_version`.
 - SARIF results include the same line as `physicalLocation.region.startLine`.
+  Confidence, zones, and optional owners are mirrored in SARIF `properties`.
 
 ## Exit codes (companion to JSON)
 

@@ -4,10 +4,10 @@ Run from a clean branch with `kujo` on `PATH`.
 
 - [ ] Update the release in `src/meta.kujo` and add a dated changelog section.
 - [ ] Confirm README command, template, test-count, and project-layout claims.
-- [ ] Check every Kujo source and test:
+- [ ] Run the Kujo-native cross-platform release gate:
 
   ```bash
-  for f in fence.kujo src/*.kujo tests/*.kujo; do kujo check "$f"; done
+  kujo run scripts/verify_release.kujo
   ```
 
 - [ ] Run unit, CLI, validation, and self-dogfood gates:
@@ -26,8 +26,9 @@ Run from a clean branch with `kujo` on `PATH`.
   kujo run scripts/release_artifacts.kujo -- --output dist/release
   ```
 
-- [ ] Sign `SHA256SUMS`, the SBOM, and provenance with the approved external
-      signing service; Fence does not manage private keys.
+- [ ] Push a signed `v*` tag through the protected release workflow. GitHub
+      creates keyless Sigstore-backed provenance attestations for `SHA256SUMS`,
+      the SBOM, and provenance; Fence never reads or manages private keys.
 - [ ] Verify `git status --short` is empty after committing release artifacts.
 - [ ] Tag the verified commit and push the branch and tag through the normal
       protected-branch workflow.

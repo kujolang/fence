@@ -1,6 +1,6 @@
 # Architecture
 
-Fence is implemented entirely in Kujo: an entry point (`fence.kujo`) plus 31
+Fence is implemented entirely in Kujo: an entry point (`fence.kujo`) plus
 focused modules under `src/`. Functions are kept small and call chains shallow
 because the Kujo VM has a limited call stack.
 
@@ -20,7 +20,8 @@ flowchart LR
 2. **walk** (`walk.kujo`) traverses `source_roots`, applying include/exclude
    globs, via an explicit stack (no recursion).
 3. **extract imports** (`imports.kujo`, `imports_ext.kujo`) scans each file
-   line-by-line for import statements and records one-based source lines.
+   line-by-line, or delegates to an explicitly configured offline parser
+   adapter, and records one-based source lines plus confidence.
 4. **resolve** (`resolve.kujo`) maps a raw import to an internal file, an
    external package, or unknown.
 5. **map zone** (`zones.kujo`) finds the first zone whose `paths` match.
@@ -29,8 +30,9 @@ flowchart LR
 
 The orchestration lives in `analyze.kujo` (`analyze_files`), driven by the
 command modules. Analysis maintains per-run import-resolution and zone-match
-caches; both are discarded at process exit and cannot affect deterministic
-output.
+caches. `check --cache` can persist import records keyed by source SHA-256,
+extractor version, and adapter fingerprint; stale or invalid entries are never
+accepted and do not affect report bytes.
 
 `graph --observed` reuses the pipeline to compare configured allowed edges with
 cross-zone internal edges actually found. Same-zone edges are omitted.
@@ -52,8 +54,9 @@ cross-zone internal edges actually found. Same-zone edges are omitted.
 | `cmd_validate.kujo` | `validate` |
 | `cmd_doctor.kujo` | `doctor` |
 | `cmd_workspace.kujo` | `workspace init` manifest discovery. |
+| `cmd_ignores.kujo` | `ignores list/check` policy-debt audit. |
 | **Config** | |
-| `config.kujo` | Load + normalize `fence.toml` / `fence.json`. |
+| `config.kujo` | Load, compose, and normalize local TOML/JSON config. |
 | `validate.kujo` | Structural validation, overlap + cycle warnings. |
 | `templates.kujo` | Starter config templates. |
 | **Analysis** | |
@@ -61,6 +64,8 @@ cross-zone internal edges actually found. Same-zone edges are omitted.
 | `glob.kujo` | Pragmatic glob matcher (`**`, `*`, `?`). |
 | `imports.kujo` | Import extraction: Kujo, JS/TS, Python. |
 | `imports_ext.kujo` | Import extraction: Rust, PHP, Go. |
+| `parser_adapters.kujo` | Structured offline parser-adapter contract. |
+| `cache.kujo` | Versioned content-digest import cache. |
 | `resolve.kujo` | Import resolution (internal/external/unknown). |
 | `zones.kujo` | File → zone mapping. |
 | `rules.kujo` | Dependency rule engine + external rules + suggestions. |

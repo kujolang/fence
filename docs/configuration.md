@@ -8,6 +8,7 @@ file with the same shape is accepted as a fallback. Generate a starter with
 
 ```toml
 version = 1
+extends = ["config/base.toml"]
 source_roots = ["src"]
 default_severity = "error"
 fail_on = "error"
@@ -31,6 +32,10 @@ exclude = ["node_modules/**", "dist/**", "build/**", "**/*.min.js", "**/*.genera
 "@" = "src"
 "~" = "src"
 
+# Optional trusted argv adapters. Fence appends the source path.
+[parser_adapters]
+".ts" = ["tree-sitter-fence-adapter", "--language", "typescript"]
+
 # Optional: treat specific third-party packages as forbidden.
 [external]
 deny = ["lodash"]
@@ -41,6 +46,7 @@ paths = ["src/ui/**", "src/components/**", "src/pages/**"]
 can_depend_on = ["domain", "shared"]
 cannot_depend_on = ["database", "infra"]
 severity = "error"
+owner = "team-ui"
 
 [[ignores]]
 from_zone = "ui"
@@ -68,6 +74,7 @@ severity = "error"
 | `unknown_dependency_policy` | string | `"warn"` | What to do with unmappable targets: `allow`/`warn`/`deny`. |
 | `output_roots` | string[] | `[]` | Optional repo-relative directories allowed for `--output`. |
 | `go_module` | string | `""` | Go module prefix used to resolve module-qualified internal imports. |
+| `extends` | string[] | `[]` | Local config files merged dependency-first before this file. |
 
 ## `[limits]`
 
@@ -86,6 +93,30 @@ Structured exceptions match `from_zone`, `to_zone`, `file` glob, and exact
 `import`; omitted match fields default to `*`. Every exception requires a
 non-empty `reason` and ISO `expires` date. Expired entries are inactive. Ignored
 violations remain visible in JSON and summary counts.
+
+Use `ignores list --within-days 30` for an inventory and `ignores check` as a
+CI expiry gate. `--fail-expiring` also fails entries inside the review window.
+
+## Config composition
+
+`extends` accepts only local, repo-relative TOML/JSON paths. Dependencies load
+first; the child overrides scalar values and merges `zones`, `aliases`,
+`external`, `scan`, `limits`, and `parser_adapters` one level. Fence rejects
+cycles, chains deeper than 16, parent traversal, absolute paths, and symlink
+escapes. Composition performs no network access.
+
+## `[parser_adapters]` (optional)
+
+Keys are extensions and values are non-empty argv arrays. Fence never invokes a
+shell; it appends the source path and expects one JSON object:
+
+```json
+{"schema":"fence.parser-adapter/v1","imports":[{"kind":"import","path":"./x","raw":"import x from './x'","line":1}]}
+```
+
+Adapter records receive `confidence: "exact"`; built-in detectors report
+`best_effort`. Adapters are executable code, so enable them only in trusted,
+reviewed configuration and pin their installation outside Fence.
 
 ## `[scan]`
 
@@ -124,6 +155,7 @@ are supported via `external_allow` / `external_deny` inside a `[zones.*]` block.
 | `severity` | string | `info` / `warning` / `error` for this zone's violations. |
 | `external_allow` | string[] | (optional) zone-scoped external allow-list. |
 | `external_deny` | string[] | (optional) zone-scoped external deny-list. |
+| `owner` | string | (optional) provider-neutral owner identifier surfaced in findings. |
 
 ### Rule precedence
 

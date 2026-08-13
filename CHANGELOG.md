@@ -19,6 +19,14 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   monorepo examples.
 - Added a Kujo-native scale harness with 1,600- and 10,000-file evidence.
 - Added deterministic checksum, SPDX SBOM, and in-toto/SLSA provenance generation.
+- Added opt-in content-digest import caching with explicit schema, extractor,
+  and parser-adapter invalidation.
+- Added trusted offline parser adapters, versioned six-language conformance
+  fixtures, and `exact`/`best_effort` confidence in JSON and SARIF.
+- Added local-only config composition with cycle/depth/path confinement, zone
+  owners, and `ignores list/check` governance gates.
+- Added Kennel package metadata, keyless release attestations, and native
+  Linux/Windows release verification.
 
 ### Fixed
 - Reject invalid `--fail-on` overrides and malformed baseline schemas instead
@@ -45,6 +53,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Memoize import resolution and zone classification within each analysis run to
   avoid repeated filesystem probes and glob matching while preserving contextual
   relative-import semantics.
+- Profile traversal and glob filtering separately and establish deterministic
+  shard/merge semantics for future native Kujo concurrency.
 
 ### Security
 - `--changed-only --base` now rejects refs beginning with `-` to prevent Git

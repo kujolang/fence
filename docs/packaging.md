@@ -35,6 +35,11 @@ This writes `SHA256SUMS`, an SPDX 2.3 JSON SBOM, and an in-toto/SLSA-shaped
 provenance statement. Sign these artifacts with the organization's approved
 external signing service; Fence never reads or manages signing keys.
 
+Official `v*` tags use the protected `.github/workflows/release.yml` path. It
+runs the full release gate, regenerates and verifies integrity artifacts,
+creates GitHub keyless provenance attestations, verifies the tag, and only then
+publishes the release.
+
 Consumers should verify checksums before installation and retain provenance with
 the release. The generated artifacts contain no timestamps or host-specific
 paths, so identical source produces identical output.

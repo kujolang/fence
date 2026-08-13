@@ -61,7 +61,9 @@ JavaScript/TypeScript, Python, Rust, PHP, Go. **Fence itself is 100% Kujo.**
 ```bash
 kujo run fence.kujo -- init                 # create a starter fence.toml
 kujo run fence.kujo -- check                # scan and report violations
+kujo run fence.kujo -- check --cache        # content-digest incremental scan
 kujo run fence.kujo -- explain src/ui/LoginForm.tsx
+kujo run fence.kujo -- ignores check        # CI gate for expired exceptions
 kujo run fence.kujo -- graph --format mermaid --output architecture.mmd
 ```
 
@@ -93,6 +95,7 @@ kujo run /path/to/fence/fence.kujo -- check
 | `baseline create` | Record current violations so legacy repos can adopt Fence gradually |
 | `baseline prune` | Remove stale baseline fingerprints after fixes |
 | `workspace init` | Generate per-package zones from local manifests |
+| `ignores list` / `ignores check` | Audit active, expiring, and expired exceptions |
 | `validate` | Validate `fence.toml` (incl. overlap & cycle warnings) |
 | `doctor` | Print environment diagnostics |
 | `help` / `--help` | Usage text |
@@ -114,12 +117,15 @@ Templates: `layered` (default), `cli`, `web-app`, `hexagonal`, `mvc`,
 | [JSON schema](docs/JSON_SCHEMA.md) | Stable machine-readable output contract |
 | [Architecture](docs/architecture.md) | Module map and how the pipeline works |
 | [Performance](docs/performance.md) | Measured numbers and scaling guidance |
+| [Consumer compatibility](docs/consumer-contract-matrix.md) | Scout, Eval, PackWrite, ShipCheck contract results |
+| [Platform verification](docs/platform-verification.md) | Linux/Windows release gates and path notes |
 | [FAQ](docs/faq.md) · [Troubleshooting](docs/troubleshooting.md) | Common questions and fixes |
 | [Release checklist](docs/release.md) | Repeatable validation and release gates |
 | [Packaging](docs/packaging.md) | Reproducible installs and integrity artifacts |
 | [Examples](examples/README.md) | Passing and failing CLI, web-app, and monorepo fixtures |
 | [Completed v1 checklist](docs/ENHANCEMENTS.md) | Prior hardening work already completed |
-| [Next enhancements](docs/NEXT_ENHANCEMENTS_2026-08-12_SESSION_2.md) | Next-session roadmap |
+| [Completed session 2](docs/NEXT_ENHANCEMENTS_2026-08-12_SESSION_2.md) | Latest completed hardening tranche |
+| [Next enhancements](docs/NEXT_ENHANCEMENTS_2026-08-12_SESSION_3.md) | Next-session roadmap |
 
 ## Example output
 
@@ -178,7 +184,8 @@ graph TD
 
 ## Limitations
 
-Best-effort line-based import detection (no AST); pragmatic glob matching
+Best-effort line-based import detection by default, with optional trusted
+offline parser adapters for AST-quality extraction; pragmatic glob matching
 (`**`, `*`, `?` — no `{}`/`[]`); conservative output-path safety (textual checks
 plus `.git`, parent-traversal, absolute-path, and symlink-escape guards). See
 [docs/troubleshooting.md](docs/troubleshooting.md) and
@@ -189,10 +196,11 @@ plus `.git`, parent-traversal, absolute-path, and symlink-escape guards). See
 ```
 fence.kujo              entry point (args -> dispatch -> exit code)
 src/*.kujo              implementation modules (see docs/architecture.md)
-tests/fence_tests.kujo  run-mode test harness (155 assertions)
+tests/fence_tests.kujo  run-mode test and versioned conformance harness
 benchmarks/             Kujo-native 1,600/10,000-file scale harness
 examples/               passing and deliberately failing example repos
 scripts/                deterministic release-integrity generation
+kennel.toml             package, runtime, and release metadata
 docs/                   documentation
 agent/                  ignored archive of implementation prompts and handoffs
 ```

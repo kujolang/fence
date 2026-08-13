@@ -5,10 +5,12 @@
 Fence is local-first and minimizes its trust surface by design:
 
 - **No network access.** Fence never makes network calls.
-- **No code execution from config.** `fence.toml` is parsed as data only; it is
-  never evaluated.
-- **No shell interpolation of untrusted input.** The only subprocesses are Git
-  commands for `--changed-only` / diagnostics. Ref names (`--base`) are
+- **Explicit adapter trust boundary.** Config is parsed as data and never
+  evaluated. Optional `[parser_adapters]` entries do launch configured argv
+  directly, without a shell; treat repositories enabling adapters as trusted
+  executable policy and pin/review the adapter installation.
+- **No shell interpolation of untrusted input.** Subprocesses are structured
+  argv calls for Git and explicitly configured parser adapters. Ref names (`--base`) are
   length-capped, character-restricted, option-safe, and rejected when they use
   ambiguous range/reflog or invalid ref syntax.
 - **Path-safe writes.** File output (`init`, `--output`, `baseline create`) is
@@ -23,6 +25,10 @@ Fence is local-first and minimizes its trust surface by design:
   bound work on hostile or accidentally huge repositories.
 - **Auditable exceptions.** Structured ignores require a reason and expiry and
   remain visible in machine reports.
+- **Confined composition.** `extends` is local-only, depth/cycle limited, and
+  rejects traversal, absolute paths, and symlink escapes.
+- **Confined cache.** The optional `.fence` cache rejects symlinked-directory
+  escapes and never stores source content, only source digests and import records.
 
 ## Supported versions
 
