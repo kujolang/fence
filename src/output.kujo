@@ -71,11 +71,11 @@ func within_cwd(p) {
     let anchor = nearest_existing_ancestor(p)
     mut abs = ""
     try {
-        abs = path_absolute(anchor)
+        abs = normalize_sep(path_absolute(anchor))
     } except e {
         return false
     }
-    let cwd = os_getcwd()
+    let cwd = normalize_sep(os_getcwd())
     if abs == cwd {
         return true
     }
