@@ -134,6 +134,7 @@ expires = "2000-01-01"
 EOF
 expect_exit 0 "$(run ignores list --format json)" "ignores list"
 expect_exit 1 "$(run ignores check)" "ignores check fails expired"
+expect_exit 2 "$(run ignores list --within-days nope)" "ignores rejects non-integer review window"
 
 echo ""
 echo "CLI smoke: $PASS passed, $FAIL failed"
