@@ -2,7 +2,7 @@
 // Conservative path-safety helpers for Fence.
 //
 // Textual checks reject absolute paths, `~`, empty paths, and `..` segments.
-// output.kujo additionally checks the canonical nearest existing ancestor.
+// output.kujo uses native directory-handle confined publication.
 
 // Normalize separators to `/` so checks are consistent across platforms.
 // Avoids allocating a new string in the common (POSIX, no-backslash) case.

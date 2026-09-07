@@ -300,6 +300,22 @@ printf 'exit(1)\n' > adapter.kujo
 expect_exit 4 "$(run explain src/client/a.ts)" "explain fails closed on adapter failure"
 cd "$WORK" || exit 6
 
+# Native publication rejects both escaping and in-repository symlink parents.
+mkdir -p "$WORK/confined-output/inside" "$WORK/outside-output"
+printf 'sentinel\n' > "$WORK/outside-output/report.json"
+cd "$WORK/confined-output" || exit 6
+expect_exit 0 "$(run init)" "confined output fixture config"
+if ln -s "$WORK/outside-output" outside-link 2>/dev/null; then
+  expect_exit 5 "$(run check --output outside-link/report.json)" "confined output rejects external symlink parent"
+  if [ "$(cat "$WORK/outside-output/report.json")" = sentinel ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: outside output sentinel changed"; fi
+  ln -s inside inside-link
+  expect_exit 5 "$(run check --output inside-link/report.json)" "confined output rejects internal symlink parent"
+  ln -s "$WORK/outside-output/report.json" final-link.json
+  expect_exit 5 "$(run check --output final-link.json)" "confined output rejects final symlink"
+fi
+expect_exit 0 "$(run check --output ./inside//new/report.json --format json)" "confined output creates parents and normalizes harmless separators"
+cd "$WORK" || exit 6
+
 echo ""
 echo "CLI smoke: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] || exit 1

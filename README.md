@@ -212,3 +212,13 @@ respect, and how to add a language extractor or run the tests. Security policy:
 [SECURITY.md](SECURITY.md). Changes: [CHANGELOG.md](CHANGELOG.md).
 
 Licensed under [MIT](LICENSE).
+
+### Runtime requirement for confined output
+
+This source version requires Kujo commit
+`0da28592ba237f00fa1769d5daa7d84c82ef3385` or a descendant containing
+`write_file_atomic_beneath`. Released Kujo 1.3.1 and earlier lack this API.
+CI pins that source commit; no newer release tag is claimed. Build that revision
+with `cargo build --release --locked` and put its `target/release` on PATH.
+Output writes fail closed on older runtimes; there is no path-based fallback.
+Symlinked output parents (including links within the repository) are rejected.

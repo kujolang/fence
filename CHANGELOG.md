@@ -140,3 +140,13 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   validation.
 - Path-safe file output and CI-friendly exit codes.
 - Run-mode test harness.
+
+### Confined output publication (F12)
+- Replaced check-then-write path operations with Kujo's directory-handle atomic
+  writer for reports, caches, baselines and generated files. No legacy fallback.
+- Requires the pinned post-v1.3.1 Kujo source commit documented in README; prior
+  releases do not expose the API. Symlinked output parents and final symlinks
+  now fail with IO exit 5, including links contained within the repository.
+- Preserved harmless relative dot/repeated separators, missing-parent creation,
+  output-root policy and overwrite behavior. Added process-level regressions and
+  native Windows/Linux tests to the pinned-runtime platform gate.
