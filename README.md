@@ -216,7 +216,7 @@ Licensed under [MIT](LICENSE).
 ### Runtime requirement for confined output
 
 This source version requires Kujo commit
-`240d092cfbfb4f2d126641350373a52420577e41` or a descendant containing
+`c11673ba44792825b2eb81153270fbe1d3110dac` or a descendant containing
 `write_file_atomic_beneath`. Released Kujo 1.3.1 and earlier lack this API.
 CI pins that source commit; no newer release tag is claimed. Build that revision
 with `cargo build --release --locked` and put its `target/release` on PATH.
