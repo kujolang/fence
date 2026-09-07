@@ -1,0 +1,20 @@
+Architecture Zones
+==================
+
+cli
+  can depend on: commands, core, foundations
+  cannot depend on: (none)
+
+commands
+  can depend on: core, foundations
+  cannot depend on: cli
+
+core
+  can depend on: foundations
+  cannot depend on: cli, commands
+
+foundations
+  can depend on: (none)
+  cannot depend on: cli, commands, core
+
+

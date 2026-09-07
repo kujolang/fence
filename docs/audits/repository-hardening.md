@@ -241,3 +241,10 @@ searches returned the capture and signal. Related CaseFile evidence was linked, 
 The existing PackWrite finding was skipped as a duplicate. Completed fixes,
 normal verification, raw logs, and implementation recaps were rejected as
 SignalBox candidates. F15-F17 remain in this scoped audit as design follow-ups.
+
+## Follow-up status
+
+The user-requested remaining-work pass resolves F15-F17. Read
+[the follow-up audit](remaining-hardening.md) for current status, compatibility
+changes and new receipts. F12 remains an explicit native-runtime dependency;
+this original report retains its historical baseline and findings.

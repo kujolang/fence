@@ -1,0 +1,2 @@
+
+Fence tests: 266 passed, 0 failed
