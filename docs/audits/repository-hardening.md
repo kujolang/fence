@@ -1,5 +1,10 @@
 # Fence repository hardening audit
 
+> Current status (2026-09-07): F12 is implemented in Kujo and integrated into Fence.
+> Linux/Windows release gates and local macOS verification pass. See the
+> [implementation and final verification receipt](confined-output-implementation.md).
+> Open F12 statements below are historical.
+
 Date: 2026-09-07. Repository: kujolang/fence. Branch: main.
 Starting SHA: fc7a000ba837050bf8bffee6252835ef0ceb55a0 (clean checkout).
 Ending implementation SHA: 4a91a40f5385f49456e319fa5b30f378e8e3f5da.

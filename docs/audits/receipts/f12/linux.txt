@@ -1,0 +1,19 @@
+Source: https://github.com/kujolang/fence/actions/runs/34121357542
+Fence: 6312e6520a9deaa48a44918a3eb0194b6db413bb
+Runtime: 97aa13a338b154646d96e5c257e5d17fed17bef9
+Selected test receipts (compiler logs remain in Actions).
+2026-09-07T12:21:05.4698607Z ##[group]Run cargo test --release --locked --manifest-path kujo-runtime/Cargo.toml --lib --test native_api_security_boundaries filesystem
+2026-09-07T12:25:38.9562271Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 854 filtered out; finished in 0.02s
+2026-09-07T12:25:39.0065994Z test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 71 filtered out; finished in 0.05s
+2026-09-07T12:25:39.9707296Z PASS: unit and contract suite
+2026-09-07T12:25:43.7163577Z PASS: CLI smoke suite
+2026-09-07T12:25:43.7578589Z PASS: self config validation
+2026-09-07T12:25:44.0713673Z PASS: self architecture check
+2026-09-07T12:25:44.1230849Z PASS: passing CLI example
+2026-09-07T12:25:44.1748262Z PASS: failing CLI example
+2026-09-07T12:25:44.2265278Z PASS: passing web example
+2026-09-07T12:25:44.2782412Z PASS: failing web example
+2026-09-07T12:25:44.3310791Z PASS: passing monorepo example
+2026-09-07T12:25:44.3828818Z PASS: failing monorepo example
+2026-09-07T12:25:44.4043865Z PASS: release integrity generation
+2026-09-07T12:25:44.4065320Z Fence release verification passed.

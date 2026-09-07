@@ -198,3 +198,7 @@ ignore evidence. Expired exceptions do not waive violations. Invalid config or
 format returns 2, failed extraction or an import ceiling returns 4, and a
 missing file still returns 5. Explanation of a denied dependency still exits 0;
 `check` is the enforcement command.
+
+Confined output requires the source runtime pinned in README. Use real directory
+paths for output parents; replace symlink aliases with their in-repository target
+paths. Reports, caches and baselines fail with IO exit 5 on rejected destinations.

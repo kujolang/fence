@@ -1,5 +1,10 @@
 # F12: runtime contract required for confined publication
 
+> Current status (2026-09-07): F12 is implemented in Kujo and integrated into Fence.
+> Linux/Windows release gates and local macOS verification pass. See the
+> [implementation and final verification receipt](confined-output-implementation.md).
+> Open F12 statements below are historical.
+
 Fence's supported Kujo runtime exposes path-based `write_file_atomic`; Fence
 checks the canonical parent before calling it. A concurrent hostile writer can
 replace an ancestor between those operations. Atomic publication prevents torn

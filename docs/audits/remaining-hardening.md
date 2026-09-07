@@ -1,5 +1,10 @@
 # Fence remaining hardening work — 2026-09-07
 
+> Current status (2026-09-07): F12 is implemented in Kujo and integrated into Fence.
+> Linux/Windows release gates and local macOS verification pass. See the
+> [implementation and final verification receipt](confined-output-implementation.md).
+> Open F12 statements below are historical.
+
 ## Repository and baseline
 
 Repository: kujolang/fence. Branch: main. Starting SHA:
