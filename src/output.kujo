@@ -61,4 +61,3 @@ export func output_root_allowed(path, roots) {
     }
     return false
 }
-
