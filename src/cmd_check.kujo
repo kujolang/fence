@@ -89,15 +89,17 @@ export func cmd_check(parsed) {
     let summary = summarize(result, cfg)
 
     let format = flag_or(flags, "format", "human")
-    let rendered = render(result, summary, loaded["path"], format)
+    let rendered = render_for_flags(result, summary, loaded["path"], format, flags, cfg["max_report_bytes"])
     if rendered["ok"] == false {
         print("Error: " + rendered["error"])
         return 2
     }
-    let report_bytes = utf8_byte_length(rendered["text"])
-    if cfg["max_report_bytes"] > 0 && report_bytes > cfg["max_report_bytes"] {
-        print("Error: resource limit exceeded: report is " + to_string(report_bytes) + " bytes, limit is " + to_string(cfg["max_report_bytes"]))
-        return 4
+    if cfg["max_report_bytes"] > 0 {
+        let report_bytes = utf8_byte_length(rendered["text"])
+        if report_bytes > cfg["max_report_bytes"] {
+            print("Error: resource limit exceeded: report is " + to_string(report_bytes) + " bytes, limit is " + to_string(cfg["max_report_bytes"]))
+            return 4
+        }
     }
 
     let quiet = has_flag(flags, "quiet")
@@ -141,6 +143,18 @@ export func cmd_check(parsed) {
 // One-line status used by --quiet / --summary-only.
 func status_line(summary) {
     return "Fence: " + to_upper(summary["status"]) + " - " + to_string(summary["files_scanned"]) + " files, " + to_string(summary["violations"]) + " violations (" + to_string(summary["errors"]) + " errors, " + to_string(summary["warnings"]) + " warnings)"
+}
+
+// Validate format even when no report body is consumed. A configured report
+// ceiling still requires the complete body, preserving existing limit semantics.
+export func render_for_flags(result, summary, config_path, format, flags, max_bytes) {
+    if format != "human" && format != "json" && format != "markdown" && format != "sarif" {
+        return { "ok": false, "error": "unknown format '" + format + "' (use human, json, markdown, sarif)", "text": "" }
+    }
+    if max_bytes == 0 && flag_or(flags, "output", "") == "" && (has_flag(flags, "quiet") || has_flag(flags, "summary-only")) {
+        return { "ok": true, "error": "", "text": "" }
+    }
+    return render(result, summary, config_path, format)
 }
 
 func render(result, summary, config_path, format) {

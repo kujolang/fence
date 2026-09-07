@@ -169,3 +169,32 @@ kujo run fence.kujo -- --version
 ```
 
 Prints the Fence release string and exits `0`.
+
+### Cache lifecycle and suppressed reports
+
+`check --cache` stores disposable built-in extraction records in
+`.fence/cache-v1.json`. The file is capped at 4 MiB and 10,000 entries; oversized
+or incompatible caches are ignored. Each successful save retains only files
+visited in that scan, including all sequential shards. Deleted, excluded and
+unselected paths are removed; changed-only runs can therefore reduce later hit
+rates. Entries exceeding retention limits are still analyzed completely.
+Extractor version 3 invalidates older entries automatically. Custom parser
+adapters always execute, including with `--cache`, so changes to adapter scripts,
+environment and dependencies remain visible. Cache contents are trusted local
+state, not authenticated evidence; omit `--cache` for untrusted cache provenance.
+
+`--quiet` and `--summary-only` skip generating the report body when no output
+file and no report-byte ceiling consume it. Invalid formats still fail. An
+explicit `--output` receives the complete report, and a configured
+`max_report_bytes` still applies to the complete selected-format body.
+
+### Explanation parity
+
+`explain` uses the same adapter extraction, Go module resolution, external
+package rules and expiring-ignore decisions as `check`. Each JSON import row
+adds `confidence`, `ignored`, `ignore_reason`, and `ignore_expires`; existing
+fields and decision strings remain. A waived violation is `allowed` with its
+ignore evidence. Expired exceptions do not waive violations. Invalid config or
+format returns 2, failed extraction or an import ceiling returns 4, and a
+missing file still returns 5. Explanation of a denied dependency still exits 0;
+`check` is the enforcement command.

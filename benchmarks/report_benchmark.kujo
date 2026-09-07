@@ -1,0 +1,22 @@
+// Isolate the report work formerly performed even for a quiet check.
+from src.cmd_check import render_for_flags
+from src.config import normalize_config
+from src.reports import summarize
+from src.util import utf8_byte_length
+mut violations = []
+mut i = 0
+while i < 1000 {
+    violations = push(violations, { "severity": "error", "from_zone": "ui", "to_zone": "db", "file": "src/ui/f" + to_string(i) + ".ts", "line": 1, "import": "../db/data", "resolved": "src/db/data.ts", "rule": "boundary", "message": "ui cannot depend on db", "suggestion": "Move the dependency behind the domain API." })
+    i = i + 1
+}
+let result = { "files_scanned": 1000, "imports_checked": 1000, "zone_files": { "ui": 1000 }, "violations": violations }
+let cfg = normalize_config({ "zones": { "ui": { "paths": ["src/ui/**"] } } })
+let summary = summarize(result, cfg)
+let before = performance_now()
+let eager = render_for_flags(result, summary, "fence.toml", "json", {}, 0)
+let eager_ms = performance_now() - before
+let after = performance_now()
+let quiet = render_for_flags(result, summary, "fence.toml", "json", { "quiet": "true" }, 0)
+let quiet_ms = performance_now() - after
+if eager["ok"] == false || quiet["ok"] == false || quiet["text"] != "" || parse_json(eager["text"])["summary"]["violations"] != 1000 { exit(1) }
+print(to_json_pretty({ "schema": "fence.report-benchmark/v1", "violations": 1000, "eager_ms": eager_ms, "quiet_ms": quiet_ms, "eager_body_bytes": utf8_byte_length(eager["text"]), "quiet_body_bytes": utf8_byte_length(quiet["text"]), "status": summary["status"] }))

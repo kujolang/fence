@@ -41,8 +41,10 @@ with `files × imports`, i.e. ~40–55 ms per file on this machine.
 - Zone classification is memoized by normalized repository path for both source
   files and resolved targets.
 - `check --cache` adds an opt-in persistent import cache keyed by source SHA-256,
-  extractor schema, and parser-adapter fingerprint. A miss always executes the
-  source extractor; warm and cold reports are byte-identical.
+  extractor schema, and adapter configuration fingerprint. Built-in source is
+  read once for both hashing and extraction. Adapters always execute because
+  their scripts, environment and other inputs cannot be identified by argv.
+  Warm and cold reports are byte-identical.
 
 ## Kujo-native benchmark harness
 
@@ -104,3 +106,16 @@ filtering was 27.27 s before and 2.16 s after on a concurrently loaded host.
 The deterministic collected-path assertion is the CI ratchet; timing is not a
 portable threshold. The separate 1,600-file scan retained 1,601 files, 1,600
 imports, zero violations, and the same resolution/zone cache counters.
+
+## Suppressed report construction (September 7 follow-up)
+
+`kujo run benchmarks/report_benchmark.kujo` isolates the eager JSON-rendering
+path previously taken by quiet checks and the new suppressed-body path on the
+same 1,000-violation result. One macOS/Kujo 1.2.3 sample produced 337,380 versus
+0 body bytes, taking 34.424506 versus 16.722882 ms. These are rendering samples,
+including argument handling; they are not end-to-end scan timings or memory
+measurements. Keep the output/limit regression tests as the stable gate, not a
+wall-clock threshold. Retain full reports when `--output` or a byte ceiling
+requires them. Cache retention is now explicitly bounded; see
+[commands](commands.md#cache-lifecycle-and-suppressed-reports) for its lifecycle
+and trust contract.

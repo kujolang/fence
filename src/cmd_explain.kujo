@@ -6,11 +6,12 @@
 
 from src.config import load_config
 from src.zones import match_zone, match_zones_all
-from src.imports import detect_imports
-from src.resolve import resolve_import
-from src.rules import check_dependency
+from src.imports import detect_imports_with_adapters
+from src.resolve import resolve_import_with_go
+from src.decisions import decide_dependency
+from src.validate import validate_config, count_errors
 from src.cliargs import flag_or
-from src.util import join_strings
+from src.util import join_strings, dict_get
 
 export func cmd_explain(parsed) {
     let positionals = parsed["positionals"]
@@ -30,14 +31,19 @@ export func cmd_explain(parsed) {
         return 3
     }
     let cfg = loaded["config"]
+    if count_errors(validate_config(cfg)) > 0 { print("Config is invalid. Run validate for details."); return 2 }
+    let format = flag_or(parsed["flags"], "format", "human")
+    if format != "json" && format != "human" { print("Error: explain format must be human or json"); return 2 }
 
     if file_exists(target) == false {
         print("File not found: " + target)
         return 5
     }
 
-    let analysis = analyze_file(target, cfg)
-    let format = flag_or(parsed["flags"], "format", "human")
+    let detected = detect_imports_with_adapters(target, cfg["parser_adapters"])
+    if detected["ok"] == false { print("Error: " + detected["error"]); return 4 }
+    if cfg["max_imports"] > 0 && len(detected["imports"]) > cfg["max_imports"] { print("Error: resource limit exceeded: max_imports"); return 4 }
+    let analysis = analyze_file(target, cfg, detected["imports"])
     if format == "json" {
         print(to_json_pretty(analysis))
         return 0
@@ -47,7 +53,7 @@ export func cmd_explain(parsed) {
 }
 
 // Produce a structured explanation for one file.
-func analyze_file(target, cfg) {
+func analyze_file(target, cfg, imps) {
     let zones = cfg["zones"]
     let zone_names = cfg["zone_names"]
     let zone = match_zone(target, zones, zone_names)
@@ -60,7 +66,6 @@ func analyze_file(target, cfg) {
         denied_deps = zones[zone]["cannot_depend_on"]
     }
 
-    let imps = detect_imports(target)
     let import_rows = explain_imports(target, zone, imps, cfg, zones, zone_names)
 
     return {
@@ -80,36 +85,23 @@ func explain_imports(target, zone, imps, cfg, zones, zone_names) {
     mut i = 0
     while i < n {
         let imp = imps[i]
-        let res = resolve_import(imp["path"], target, cfg["source_roots"], cfg["aliases"])
-        let row = explain_one(zone, imp, res, cfg, zones, zone_names)
+        let res = resolve_import_with_go(imp["path"], target, cfg["source_roots"], cfg["aliases"], cfg["go_module"])
+        let row = explain_one(target, zone, imp, res, cfg, zones, zone_names)
         out = push(out, row)
         i = i + 1
     }
     return out
 }
 
-func explain_one(zone, imp, res, cfg, zones, zone_names) {
+func explain_one(target, zone, imp, res, cfg, zones, zone_names) {
     let status = res["status"]
     mut to_zone = "unknown"
     if status == "internal" {
         to_zone = match_zone(res["resolved"], zones, zone_names)
     }
 
-    mut decision = "allowed"
-    if status == "external" {
-        decision = "external"
-    } else {
-        if zone == "unknown" {
-            decision = "ungoverned"
-        } else {
-            let verdict = check_dependency(zone, to_zone, cfg)
-            if verdict["allowed"] {
-                decision = "allowed"
-            } else {
-                decision = "denied"
-            }
-        }
-    }
+    let verdict = decide_dependency(target, zone, imp, res, to_zone, cfg)
+    let ignored = verdict["ignore"]
 
     return {
         "import": imp["path"],
@@ -118,7 +110,11 @@ func explain_one(zone, imp, res, cfg, zones, zone_names) {
         "status": status,
         "resolved": res["resolved"],
         "to_zone": to_zone,
-        "decision": decision
+        "decision": verdict["decision"],
+        "confidence": dict_get(imp, "confidence", "best_effort"),
+        "ignored": ignored["ignored"],
+        "ignore_reason": ignored["reason"],
+        "ignore_expires": ignored["expires"]
     }
 }
 
@@ -151,6 +147,7 @@ func explain_human(a) {
         } else {
             o = o + " (" + r["status"] + ")"
         }
+        if r["ignored"] { o = o + " (ignored: " + r["ignore_reason"] + "; expires " + r["ignore_expires"] + ")" }
         o = o + "\n"
         i = i + 1
     }

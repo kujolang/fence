@@ -37,7 +37,9 @@ from src.walk import include_extensions, walk_profile
 from src.graph import render_observed_graph
 from src.ignores import ignore_match, audit_ignores
 from src.parser_adapters import run_adapter
-from src.cache import cached_imports, empty_cache
+from src.cache import cached_imports, empty_cache, cache_document, cache_max_bytes, cache_max_entries
+from src.cmd_check import render_for_flags
+from src.decisions import decide_dependency
 from src.output import write_safe
 
 mut g_pass = 0
@@ -474,6 +476,60 @@ delete_file("tests/tmp/mixed/client/b.go")
 delete_file("tests/tmp/mixed/target.ts")
 os_rmdir("tests/tmp/mixed/client")
 os_rmdir("tests/tmp/mixed")
+
+// Cache retention never truncates analysis, including sequential shards.
+let cache_source = "tests/tmp/cache-lifecycle.ts"
+write_file(cache_source, "import x from \"alpha\"", true)
+let cold_cache = cached_imports(cache_source, {}, empty_cache({}))
+mut warm_seed = empty_cache({})
+warm_seed["entries"] = cache_document(cold_cache["cache"])["entries"]
+let warm_cache = cached_imports(cache_source, {}, warm_seed)
+ok("unchanged source hits cache", warm_cache["hit"])
+eq("cache preserves extraction", cold_cache["result"], warm_cache["result"])
+write_file(cache_source, "import x from \"beta\"", true)
+let changed_cache = cached_imports(cache_source, {}, warm_seed)
+eq("changed source misses cache", changed_cache["hit"], false)
+eq("changed source extracts new import", changed_cache["result"]["imports"][0]["path"], "beta")
+eq("new scan removes unvisited entries", len(keys(cache_document(warm_seed)["entries"])), 0)
+mut entry_full = empty_cache({})
+entry_full["retained_count"] = cache_max_entries()
+let entry_capped = cached_imports(cache_source, {}, entry_full)
+eq("entry ceiling prevents retention", len(keys(cache_document(entry_capped["cache"])["entries"])), 0)
+eq("entry ceiling preserves imports", entry_capped["result"], changed_cache["result"])
+mut byte_full = empty_cache({})
+byte_full["retained_bytes"] = cache_max_bytes()
+let byte_capped = cached_imports(cache_source, {}, byte_full)
+eq("byte ceiling prevents retention", len(keys(cache_document(byte_capped["cache"])["entries"])), 0)
+eq("byte ceiling preserves imports", byte_capped["result"], changed_cache["result"])
+let missing_cache = cached_imports("tests/tmp/missing-cache-source.ts", {}, empty_cache({}))
+eq("missing source fails extraction", missing_cache["result"]["ok"], false)
+eq("failed extraction not retained", len(keys(cache_document(missing_cache["cache"])["entries"])), 0)
+write_file("tests/tmp/cache-second.ts", "import x from \"gamma\"", true)
+mut sharded_cache_cfg = normalize_config({ "zones": { "all": { "paths": ["tests/tmp/**"] } } })
+sharded_cache_cfg["use_cache"] = true
+sharded_cache_cfg["import_cache"] = empty_cache({})
+let sharded_cache = analyze_sharded([cache_source, "tests/tmp/cache-second.ts"], sharded_cache_cfg, 2)
+eq("all shards retain cache", len(keys(cache_document(sharded_cache["import_cache"])["entries"])), 2)
+delete_file(cache_source)
+delete_file("tests/tmp/cache-second.ts")
+
+let policy_import = { "path": "lodash", "line": 1, "kind": "import", "raw": "", "confidence": "exact", "detector": "test" }
+let policy_external = { "status": "external", "resolved": "" }
+eq("shared external deny", decide_dependency("src/ui/a.ts", "ui", policy_import, policy_external, "unknown", ext_cfg)["decision"], "denied")
+mut ignored_policy = ext_cfg
+ignored_policy["ignores"] = [{ "reason": "migration", "expires": "2999-01-01" }]
+let policy_ignored = decide_dependency("src/ui/a.ts", "ui", policy_import, policy_external, "unknown", ignored_policy)
+eq("shared active ignore allows", policy_ignored["decision"], "allowed")
+eq("shared ignore preserves reason", policy_ignored["ignore"]["reason"], "migration")
+ignored_policy["ignores"] = [{ "reason": "expired", "expires": "2000-01-01" }]
+eq("shared expired ignore denies", decide_dependency("src/ui/a.ts", "ui", policy_import, policy_external, "unknown", ignored_policy)["decision"], "denied")
+eq("shared ungoverned source", decide_dependency("other/a.ts", "unknown", policy_import, policy_external, "unknown", ext_cfg)["decision"], "ungoverned")
+
+eq("quiet omits unused body", render_for_flags(fake_result, summary, "fence.toml", "json", { "quiet": "true" }, 0)["text"], "")
+eq("summary omits unused body", render_for_flags(fake_result, summary, "fence.toml", "json", { "summary-only": "true" }, 0)["text"], "")
+eq("quiet validates format", render_for_flags(fake_result, summary, "fence.toml", "invalid", { "quiet": "true" }, 0)["ok"], false)
+eq("quiet output preserves report", render_for_flags(fake_result, summary, "fence.toml", "json", { "quiet": "true", "output": "out.json" }, 0)["text"], render_json(fake_result, summary, "fence.toml"))
+eq("quiet ceiling measures report", render_for_flags(fake_result, summary, "fence.toml", "json", { "quiet": "true" }, 1)["text"], render_json(fake_result, summary, "fence.toml"))
 
 // ---- summary ----
 print("")

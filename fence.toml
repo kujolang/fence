@@ -27,6 +27,7 @@ severity = "error"
 [zones.core]
 paths = [
   "src/analyze.kujo",
+  "src/decisions.kujo",
   "src/cache.kujo",
   "src/parser_adapters.kujo",
   "src/config.kujo",

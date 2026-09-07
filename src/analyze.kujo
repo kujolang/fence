@@ -7,10 +7,9 @@
 from src.imports import detect_imports_with_adapters
 from src.resolve import resolve_import_with_go
 from src.zones import match_zone
-from src.rules import check_dependency, make_violation, check_external, make_external_violation
+from src.decisions import decide_dependency
 from src.util import dict_get, dict_has, arr_has
 from src.paths import file_ext
-from src.ignores import ignore_match
 from src.cache import cached_imports
 
 // Analyze a list of files against the config. Returns:
@@ -104,9 +103,10 @@ export func analyze_files(files, cfg) {
                         }
                     }
                 }
-                let v = judge(file, file_zone, imp, res, to_zone, cfg)
+                let decision = decide_dependency(file, file_zone, imp, res, to_zone, cfg)
+                let v = decision["violation"]
                 if dict_has(v, "severity") {
-                    let ignored = ignore_match(v, cfg["ignores"])
+                    let ignored = decision["ignore"]
                     if ignored["ignored"] {
                         ignored_violations = push(ignored_violations, { "file": v["file"], "line": v["line"], "import": v["import"], "reason": ignored["reason"], "expires": ignored["expires"] })
                     } else {
@@ -143,14 +143,16 @@ export func analyze_files(files, cfg) {
 // the current Kujo process primitive waits synchronously; it establishes merge
 // semantics for future native concurrency without shell/background execution.
 export func analyze_sharded(files, cfg, shard_count) {
-    if shard_count <= 1 { return analyze_files(files, cfg) }
+    if shard_count <= 1 || len(files) == 0 { return analyze_files(files, cfg) }
+    mut shard_cfg = cfg
     mut combined = empty_result()
     let total = len(files)
     let width = ceil(total / shard_count)
     mut offset = 0
     while offset < total {
         let end = min(offset + width, total)
-        let part = analyze_files(slice(files, offset, end), cfg)
+        let part = analyze_files(slice(files, offset, end), shard_cfg)
+        shard_cfg["import_cache"] = part["import_cache"]
         combined = merge_results(combined, part)
         offset = end
     }
@@ -202,33 +204,6 @@ func merge_unique(left, right) {
         i = i + 1
     }
     return out
-}
-
-// Evaluate one resolved import. Returns a violation record, or 0 when allowed
-// / not applicable.
-func judge(file, file_zone, imp, res, to_zone, cfg) {
-    let status = res["status"]
-
-    // External packages: allowed by default, unless an allow/deny list applies.
-    if status == "external" {
-        let ev = check_external(file_zone, imp["path"], cfg)
-        if ev["allowed"] {
-            return {}
-        }
-        return make_external_violation(ev["severity"], file_zone, file, imp["path"], imp["line"], ev["rule"], dict_get(imp, "confidence", "best_effort"), zone_owner(cfg, file_zone))
-    }
-
-    let verdict = check_dependency(file_zone, to_zone, cfg)
-    if verdict["allowed"] {
-        return {}
-    }
-
-    return make_violation(verdict["severity"], file_zone, to_zone, file, imp["path"], imp["line"], res["resolved"], verdict["rule"], dict_get(imp, "confidence", "best_effort"), zone_owner(cfg, file_zone), zone_owner(cfg, to_zone))
-}
-
-func zone_owner(cfg, zone) {
-    if dict_has(cfg["zones"], zone) { return dict_get(cfg["zones"][zone], "owner", "") }
-    return ""
 }
 
 // Relative and Rust module imports depend on the importing file. Other imports

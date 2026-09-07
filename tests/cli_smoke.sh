@@ -209,6 +209,97 @@ case "$(cat budget-diagnostic.txt)" in
 esac
 cd "$WORK" || exit 6
 
+# Explain shares adapter, Go, external-package and ignore policy with check.
+mkdir -p "$WORK/parity/src/client"
+cd "$WORK/parity" || exit 6
+printf 'export const x = 1\n' > src/target.ts
+printf 'import "example.com/acme/target"\n' > src/client/a.go
+printf 'import x from "blocked"\n' > src/client/a.ts
+cat > fence.json <<'JSON'
+{"version":1,"source_roots":["src"],"go_module":"example.com/acme","external":{"deny":["blocked"]},"zones":{"client":{"paths":["src/client/**"],"cannot_depend_on":["target"]},"target":{"paths":["src/target.ts"]}}}
+JSON
+expect_exit 1 "$(run check --cache --format json)" "parity check denies dependencies"
+"$KUJO" run "$FENCE" -- explain src/client/a.go --format json > go.json
+"$KUJO" run "$FENCE" -- explain src/client/a.ts --format json > external.json
+cat > assert.kujo <<'KUJO'
+let go = parse_json(read_file("go.json"))["imports"][0]
+let ext = parse_json(read_file("external.json"))["imports"][0]
+if go["decision"] != "denied" || go["to_zone"] != "target" || ext["decision"] != "denied" { exit(1) }
+KUJO
+"$KUJO" run assert.kujo >/dev/null 2>&1
+expect_exit 0 "$?" "explain Go and external denial parity"
+cat > add-ignore.kujo <<'KUJO'
+mut cfg = parse_json(read_file("fence.json"))
+cfg["ignores"] = [{ "reason": "migration", "expires": "2999-01-01" }]
+write_file("fence.json", to_json(cfg), true)
+KUJO
+"$KUJO" run add-ignore.kujo >/dev/null 2>&1
+expect_exit 0 "$(run check --cache)" "active ignore check parity"
+"$KUJO" run "$FENCE" -- explain src/client/a.ts --format json > external.json
+printf 'let row = parse_json(read_file("external.json"))["imports"][0]\nif row["decision"] != "allowed" || row["ignored"] != true || row["ignore_reason"] != "migration" { exit(1) }\n' > assert.kujo
+"$KUJO" run assert.kujo >/dev/null 2>&1
+expect_exit 0 "$?" "explain preserves active ignore evidence"
+expect_exit 2 "$(run check --quiet --format invalid)" "quiet validates report format"
+expect_exit 2 "$(run explain src/client/a.ts --format invalid)" "explain validates format"
+expect_exit 0 "$(run check --quiet --format json --output quiet.json)" "quiet still writes output"
+printf 'parse_json(read_file("quiet.json"))\n' > assert.kujo
+"$KUJO" run assert.kujo >/dev/null 2>&1
+expect_exit 0 "$?" "quiet output is complete JSON"
+# Stale cache paths are compacted; simultaneous writers publish complete JSON.
+rm src/client/a.go
+"$KUJO" run "$FENCE" -- check --cache --format json > concurrent-a.json 2> concurrent-a.err &
+cache_pid_a=$!
+"$KUJO" run "$FENCE" -- check --cache --format json > concurrent-b.json 2> concurrent-b.err &
+cache_pid_b=$!
+wait "$cache_pid_a"
+expect_exit 0 "$?" "first concurrent cache writer"
+wait "$cache_pid_b"
+expect_exit 0 "$?" "second concurrent cache writer"
+cat > assert.kujo <<'KUJO'
+let cache = parse_json(read_file(".fence/cache-v1.json"))
+if len(keys(cache["entries"])) != 2 || has_key(cache["entries"], "src/client/a.go") == 1 { exit(1) }
+if parse_json(read_file("concurrent-a.json")) != parse_json(read_file("concurrent-b.json")) { exit(1) }
+KUJO
+"$KUJO" run assert.kujo >/dev/null 2>&1
+expect_exit 0 "$?" "concurrent cache publication and stale compaction"
+# Reject over-budget cache input before parsing; analysis still succeeds.
+dd if=/dev/zero of=.fence/cache-v1.json bs=4194305 count=1 2>/dev/null
+expect_exit 0 "$(run check --cache)" "oversized cache is disposable"
+printf 'let c = parse_json(read_file(".fence/cache-v1.json"))\nif c["extractor_version"] != 3 || len(keys(c["entries"])) != 2 { exit(1) }\n' > assert.kujo
+"$KUJO" run assert.kujo >/dev/null 2>&1
+expect_exit 0 "$?" "oversized cache replaced with bounded current scan"
+cat > configure-limit.kujo <<'KUJO'
+mut cfg = parse_json(read_file("fence.json"))
+cfg["limits"] = { "max_report_bytes": 1 }
+write_file("fence.json", to_json(cfg), true)
+KUJO
+"$KUJO" run configure-limit.kujo >/dev/null 2>&1
+expect_exit 4 "$(run check --quiet --format json)" "quiet enforces report ceiling"
+
+# Adapter changes must be visible with identical argv and an existing cache.
+cat > adapter.kujo <<'KUJO'
+print(to_json({ "schema": "fence.parser-adapter/v1", "imports": [{ "path": "blocked", "line": 1, "kind": "import" }] }))
+KUJO
+cat > configure-adapter.kujo <<'KUJO'
+mut cfg = parse_json(read_file("fence.json"))
+cfg["limits"] = {}
+cfg["ignores"] = []
+cfg["scan"] = { "include": ["src/**/*.ts"] }
+cfg["parser_adapters"] = { ".ts": ["kujo", "run", "adapter.kujo", "--"] }
+write_file("fence.json", to_json(cfg), true)
+KUJO
+"$KUJO" run configure-adapter.kujo >/dev/null 2>&1
+expect_exit 1 "$(run check --cache)" "cached check executes adapter"
+"$KUJO" run "$FENCE" -- explain src/client/a.ts --format json > external.json
+printf 'if parse_json(read_file("external.json"))["imports"][0]["decision"] != "denied" { exit(1) }\n' > assert.kujo
+"$KUJO" run assert.kujo >/dev/null 2>&1
+expect_exit 0 "$?" "explain uses configured adapter"
+printf 'print(to_json({ "schema": "fence.parser-adapter/v1", "imports": [] }))\n' > adapter.kujo
+expect_exit 0 "$(run check --cache)" "adapter script change invalidates prior result"
+printf 'exit(1)\n' > adapter.kujo
+expect_exit 4 "$(run explain src/client/a.ts)" "explain fails closed on adapter failure"
+cd "$WORK" || exit 6
+
 echo ""
 echo "CLI smoke: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] || exit 1

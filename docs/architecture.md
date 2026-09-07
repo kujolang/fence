@@ -31,8 +31,9 @@ flowchart LR
 The orchestration lives in `analyze.kujo` (`analyze_files`), driven by the
 command modules. Analysis maintains per-run import-resolution and zone-match
 caches. `check --cache` can persist import records keyed by source SHA-256,
-extractor version, and adapter fingerprint; digest/version-mismatched or malformed entries are re-extracted and do not affect
-report bytes. Cache contents remain trusted local state, not authenticated evidence.
+extractor version, and adapter configuration fingerprint. Custom adapters always
+execute; only built-in extraction is persisted. Digest/version-mismatched or
+malformed entries are re-extracted and do not affect report bytes. Cache contents remain trusted local state, not authenticated evidence.
 
 `graph --observed` reuses the pipeline to compare configured allowed edges with
 cross-zone internal edges actually found. Same-zone edges are omitted.
@@ -65,6 +66,7 @@ cross-zone internal edges actually found. Same-zone edges are omitted.
 | `imports.kujo` | Import extraction: Kujo, JS/TS, Python. |
 | `imports_ext.kujo` | Import extraction: Rust, PHP, Go. |
 | `parser_adapters.kujo` | Structured offline parser-adapter contract. |
+| `decisions.kujo` | Shared dependency and ignore decisions for check/explain. |
 | `cache.kujo` | Versioned content-digest import cache. |
 | `resolve.kujo` | Import resolution (internal/external/unknown). |
 | `zones.kujo` | File → zone mapping. |

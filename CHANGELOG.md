@@ -6,6 +6,18 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Remaining audit work (2026-09-07)
+- Bounded disposable built-in caches to 4 MiB and 10,000 records; compacted
+  retention to files visited in the current scan and preserved all shards.
+  Hashing and extraction now use one source snapshot. Custom adapters always
+  execute, so changes outside their argv cannot reuse stale results.
+- Shared check/explain dependency decisions, including Go modules, external
+  policy, active ignores, and configured adapters. Explain import rows add
+  confidence, ignored, ignore_reason, and ignore_expires. Invalid formats/configs
+  fail with exit 2; failed extraction or import ceilings fail with exit 4.
+- Quiet/summary checks skip unused report bodies while preserving output files,
+  configured report limits, format validation, and exit codes.
+
 ### Repository hardening (2026-09-07)
 - Fixed changed-only scans with empty excludes and preserved quoted, Unicode,
   and whitespace-containing Git paths using structured argv and NUL records.
