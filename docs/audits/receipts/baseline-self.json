@@ -1,0 +1,92 @@
+{
+  "config": {
+    "path": "fence.toml"
+  },
+  "ignored_violations": [],
+  "schema_version": 1,
+  "skipped_files": [],
+  "status": "passed",
+  "summary": {
+    "errors": 0,
+    "files_scanned": 34,
+    "ignored_violations": 0,
+    "imports_checked": 103,
+    "skipped_files": 0,
+    "violations": 3,
+    "warnings": 3
+  },
+  "version": "1.0.0",
+  "violations": [
+    {
+      "confidence": "best_effort",
+      "file": "src/analyze.kujo",
+      "from_owner": "",
+      "from_zone": "core",
+      "import": "src.cache",
+      "line": 14,
+      "message": "core cannot depend on unknown",
+      "resolved": "src/cache.kujo",
+      "rule": "unlisted dependency under unknown_dependency_policy = warn",
+      "severity": "warning",
+      "suggestion": "Define this relationship explicitly in fence.toml, or move the target into a known zone.",
+      "to_owner": "",
+      "to_zone": "unknown"
+    },
+    {
+      "confidence": "best_effort",
+      "file": "src/cmd_check.kujo",
+      "from_owner": "",
+      "from_zone": "commands",
+      "import": "src.cache",
+      "line": 16,
+      "message": "commands cannot depend on unknown",
+      "resolved": "src/cache.kujo",
+      "rule": "unlisted dependency under unknown_dependency_policy = warn",
+      "severity": "warning",
+      "suggestion": "Define this relationship explicitly in fence.toml, or move the target into a known zone.",
+      "to_owner": "",
+      "to_zone": "unknown"
+    },
+    {
+      "confidence": "best_effort",
+      "file": "src/imports.kujo",
+      "from_owner": "",
+      "from_zone": "core",
+      "import": "src.parser_adapters",
+      "line": 14,
+      "message": "core cannot depend on unknown",
+      "resolved": "src/parser_adapters.kujo",
+      "rule": "unlisted dependency under unknown_dependency_policy = warn",
+      "severity": "warning",
+      "suggestion": "Define this relationship explicitly in fence.toml, or move the target into a known zone.",
+      "to_owner": "",
+      "to_zone": "unknown"
+    }
+  ],
+  "zones": [
+    {
+      "errors": 0,
+      "files": 1,
+      "name": "cli",
+      "warnings": 0
+    },
+    {
+      "errors": 0,
+      "files": 9,
+      "name": "commands",
+      "warnings": 1
+    },
+    {
+      "errors": 0,
+      "files": 17,
+      "name": "core",
+      "warnings": 2
+    },
+    {
+      "errors": 0,
+      "files": 5,
+      "name": "foundations",
+      "warnings": 0
+    }
+  ]
+}

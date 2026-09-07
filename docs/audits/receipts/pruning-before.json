@@ -1,0 +1,8 @@
+{
+  "discovered": 1100,
+  "filter_ms": 26507.732612,
+  "generated": 1100,
+  "schema": "fence.pruning-benchmark/v1",
+  "selected": 100,
+  "traversal_ms": 759.9226970000001
+}

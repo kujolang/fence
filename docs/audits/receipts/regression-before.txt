@@ -1,0 +1,5 @@
+FAIL: changed-only empty excludes and quoted filename (exit 0, expected 1)
+FAIL: full and changed-only reports agree
+FAIL: changed-only staged quoted filename (exit 0, expected 1)
+
+CLI smoke: 35 passed, 3 failed

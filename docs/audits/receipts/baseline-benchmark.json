@@ -1,0 +1,23 @@
+{
+  "analyze_ms": 189826.486314,
+  "engine": "kujo",
+  "files_scanned": 1601,
+  "filter_ms": 33762.53114399999,
+  "generation_ms": 13189.017608,
+  "imports_checked": 1600,
+  "metrics": {
+    "import_cache_hits": 0,
+    "import_cache_misses": 0,
+    "resolution_cache_hits": 1599,
+    "resolution_cache_misses": 1,
+    "zone_cache_hits": 1600,
+    "zone_cache_misses": 1601
+  },
+  "requested_files": 1600,
+  "schema": "fence.benchmark/v1",
+  "shards": 1,
+  "total_scan_ms": 224839.625024,
+  "traversal_ms": 1250.6075660000006,
+  "violations": 0,
+  "walk_ms": 35013.13870999999
+}

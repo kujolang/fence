@@ -1,0 +1,4 @@
+FAIL: zone inherits default severity (got=error want=warning)
+FAIL: omitted ignore file matches nested paths
+
+Fence tests: 192 passed, 2 failed
