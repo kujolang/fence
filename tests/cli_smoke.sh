@@ -305,7 +305,7 @@ mkdir -p "$WORK/confined-output/inside" "$WORK/outside-output"
 printf 'sentinel\n' > "$WORK/outside-output/report.json"
 cd "$WORK/confined-output" || exit 6
 expect_exit 0 "$(run init)" "confined output fixture config"
-if ln -s "$WORK/outside-output" outside-link 2>/dev/null; then
+if ln -s "$WORK/outside-output" outside-link 2>/dev/null && [ -L outside-link ]; then
   expect_exit 5 "$(run check --output outside-link/report.json)" "confined output rejects external symlink parent"
   if [ "$(cat "$WORK/outside-output/report.json")" = sentinel ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: outside output sentinel changed"; fi
   ln -s inside inside-link

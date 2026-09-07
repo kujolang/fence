@@ -110,7 +110,7 @@ Next: [Two-minute demo](demo.md) · [Configuration](configuration.md) ·
 ### Runtime requirement for confined output
 
 This source version requires Kujo commit
-`c11673ba44792825b2eb81153270fbe1d3110dac` or a descendant containing
+`97aa13a338b154646d96e5c257e5d17fed17bef9` or a descendant containing
 `write_file_atomic_beneath`. Released Kujo 1.3.1 and earlier lack this API.
 CI pins that source commit; no newer release tag is claimed. Build that revision
 with `cargo build --release --locked` and put its `target/release` on PATH.
