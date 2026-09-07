@@ -85,6 +85,8 @@ func parse_config_file(path) {
         return { "ok": false, "error": "invalid config syntax in " + path, "raw": {} }
     }
     if type_of(parsed) != "dict" { return { "ok": false, "error": "config root must be an object: " + path, "raw": {} } }
+    let shape_error = raw_shape_error(parsed)
+    if shape_error != "" { return { "ok": false, "error": shape_error + " in " + path, "raw": {} } }
     return { "ok": true, "error": "", "raw": parsed }
 }
 
@@ -167,14 +169,14 @@ export func normalize_config(raw) {
     cfg["external_deny"] = dict_get(ext, "deny", [])
 
     let zones = dict_get(raw, "zones", {})
-    cfg["zones"] = normalize_zones(zones)
+    cfg["zones"] = normalize_zones(zones, cfg["default_severity"])
     cfg["zone_names"] = keys(cfg["zones"])
 
     return cfg
 }
 
 // Ensure every zone has the expected fields with sane defaults.
-func normalize_zones(zones) {
+func normalize_zones(zones, default_severity) {
     let names = keys(zones)
     let n = len(names)
     mut out = {}
@@ -186,7 +188,7 @@ func normalize_zones(zones) {
         zn["paths"] = dict_get(z, "paths", [])
         zn["can_depend_on"] = dict_get(z, "can_depend_on", [])
         zn["cannot_depend_on"] = dict_get(z, "cannot_depend_on", [])
-        zn["severity"] = dict_get(z, "severity", "error")
+        zn["severity"] = dict_get(z, "severity", default_severity)
         zn["external_allow"] = dict_get(z, "external_allow", [])
         zn["external_deny"] = dict_get(z, "external_deny", [])
         zn["owner"] = dict_get(z, "owner", "")
@@ -194,4 +196,60 @@ func normalize_zones(zones) {
         i = i + 1
     }
     return out
+}
+
+// Reject malformed containers before normalization or command-specific use.
+// Unknown keys remain accepted for forward-compatible configuration.
+func raw_shape_error(raw) {
+    let table_fields = ["scan", "limits", "external", "zones", "aliases", "parser_adapters"]
+    mut i = 0
+    while i < len(table_fields) {
+        let key = table_fields[i]
+        if dict_has(raw, key) && type_of(raw[key]) != "dict" { return key + " must be a table" }
+        i = i + 1
+    }
+    let list_error = string_lists_error(raw, ["source_roots", "output_roots", "extends"])
+    if list_error != "" { return list_error }
+    let scan_error = string_lists_error(dict_get(raw, "scan", {}), ["include", "exclude"])
+    if scan_error != "" { return "scan." + scan_error }
+    let external_error = string_lists_error(dict_get(raw, "external", {}), ["allow", "deny"])
+    if external_error != "" { return "external." + external_error }
+    let raw_zones = dict_get(raw, "zones", {})
+    let names = keys(raw_zones)
+    mut j = 0
+    while j < len(names) {
+        let zone = raw_zones[names[j]]
+        if type_of(zone) != "dict" { return "zones." + names[j] + " must be a table" }
+        let zone_error = string_lists_error(zone, ["paths", "can_depend_on", "cannot_depend_on", "external_allow", "external_deny"])
+        if zone_error != "" { return "zones." + names[j] + "." + zone_error }
+        j = j + 1
+    }
+    let aliases = dict_get(raw, "aliases", {})
+    let alias_names = keys(aliases)
+    mut k = 0
+    while k < len(alias_names) {
+        if type_of(aliases[alias_names[k]]) != "string" { return "aliases values must be strings" }
+        k = k + 1
+    }
+    let ignores = dict_get(raw, "ignores", [])
+    if type_of(ignores) != "array" { return "ignores must be an array of tables" }
+    return ""
+}
+
+func string_lists_error(object, fields) {
+    mut i = 0
+    while i < len(fields) {
+        let name = fields[i]
+        if dict_has(object, name) {
+            let values = object[name]
+            if type_of(values) != "array" { return name + " must be an array of strings" }
+            mut j = 0
+            while j < len(values) {
+                if type_of(values[j]) != "string" { return name + " entries must be strings" }
+                j = j + 1
+            }
+        }
+        i = i + 1
+    }
+    return ""
 }

@@ -2,18 +2,16 @@
 // Minimal, safe Git integration for Fence.
 //
 // Only used by `--changed-only`/`--base` and `doctor`. Ref names are strictly
-// validated before being placed in a shell command so untrusted input cannot
-// inject additional commands. If validation fails, the feature errors clearly
-// instead of running anything.
+// validated before structured argv calls. NUL-delimited paths preserve Git
+// filenames without quoting, line splitting, or whitespace trimming.
 
-from src.paths import normalize_sep
 
 // True when the current working directory is inside a Git repo.
 export func is_git_repo() {
     if path_is_dir(".git") {
         return true
     }
-    let r = execute_status("git rev-parse --is-inside-work-tree")
+    let r = spawn_process(["git", "rev-parse", "--is-inside-work-tree"])
     if r.success == true {
         return trim(r.stdout) == "true"
     }
@@ -22,7 +20,7 @@ export func is_git_repo() {
 
 // Current branch name, or "" when unavailable.
 export func current_branch() {
-    let r = execute_status("git rev-parse --abbrev-ref HEAD")
+    let r = spawn_process(["git", "rev-parse", "--abbrev-ref", "HEAD"])
     if r.success == true {
         return trim(r.stdout)
     }
@@ -64,16 +62,16 @@ export func changed_files(base) {
     }
 
     // Tracked changes vs base, plus staged/unstaged changes, plus untracked.
-    let diff = execute_status("git diff --name-only " + base)
-    if diff.success == false {
-        return mk_err("git diff failed for base " + base + ". Verify the ref exists locally; in a shallow CI checkout, fetch the base branch with sufficient history before running Fence.", 4)
+    let diff = spawn_process(["git", "diff", "--name-only", "-z", base, "--"])
+    if diff.success == false || diff.stdout_truncated {
+        return mk_err("git diff failed or its output was truncated for base " + base + ". Verify the ref exists locally; in a shallow CI checkout, fetch the base branch with sufficient history before running Fence.", 4)
     }
-    let untracked = execute_status("git ls-files --others --exclude-standard")
+    let untracked = spawn_process(["git", "ls-files", "--others", "--exclude-standard", "-z"])
 
-    mut files = parse_lines(diff.stdout)
-    if untracked.success == true {
-        files = append_unique(files, parse_lines(untracked.stdout))
+    if untracked.success == false || untracked.stdout_truncated {
+        return mk_err("git ls-files failed or its output was truncated; cannot select a complete changed-file set", 4)
     }
+    let files = sort(append_unique(parse_paths(diff.stdout), parse_paths(untracked.stdout)))
     return { "ok": true, "error": "", "code": 0, "files": files }
 }
 
@@ -83,26 +81,26 @@ export func changed_count() {
     if is_git_repo() == false {
         return -1
     }
-    let diff = execute_status("git diff --name-only HEAD")
-    if diff.success == false {
+    let diff = spawn_process(["git", "diff", "--name-only", "-z", "HEAD", "--"])
+    if diff.success == false || diff.stdout_truncated {
         return -1
     }
-    return len(parse_lines(diff.stdout))
+    return len(parse_paths(diff.stdout))
 }
 
 func mk_err(msg, code) {
     return { "ok": false, "error": msg, "code": code, "files": [] }
 }
 
-func parse_lines(text) {
-    let raw = split(text, "\n")
+func parse_paths(text) {
+    let raw = split(text, parse_json("\"\\u0000\""))
     let n = len(raw)
     mut out = []
     mut i = 0
     while i < n {
-        let line = trim(raw[i])
+        let line = raw[i]
         if line != "" {
-            out = push(out, normalize_sep(line))
+            out = push(out, line)
         }
         i = i + 1
     }

@@ -145,3 +145,6 @@
 # /fence.toml
 # /.lens.toml
 # /packwrite.toml
+
+# Local hardening audit scratch space; reviewed receipts live in docs/audits.
+/.audit-evidence/

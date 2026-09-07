@@ -136,6 +136,79 @@ expect_exit 0 "$(run ignores list --format json)" "ignores list"
 expect_exit 1 "$(run ignores check)" "ignores check fails expired"
 expect_exit 2 "$(run ignores list --within-days nope)" "ignores rejects non-integer review window"
 
+# Changed-only must agree with a full scan with empty excludes and unusual names.
+mkdir -p "$WORK/changed/src/ui" "$WORK/changed/src/database"
+cd "$WORK/changed" || exit 6
+git init -q
+git -c user.name=Fence -c user.email=fence@example.invalid commit -q --allow-empty -m baseline
+printf '%s\n' '{"version":1,"source_roots":["src"],"scan":{"include":["src/**/*.ts"],"exclude":[]},"zones":{"ui":{"paths":["src/ui/**"],"cannot_depend_on":["database"]},"database":{"paths":["src/database/**"]}}}' > fence.json
+printf 'export const x = 1\n' > src/database/users.ts
+printf 'import { x } from "../database/users"\n' > 'src/ui/odd "é" name.ts'
+expect_exit 1 "$(run check --changed-only)" "changed-only empty excludes and quoted filename"
+F="$("$KUJO" run "$FENCE" -- check --format json 2>/dev/null)"
+G="$("$KUJO" run "$FENCE" -- check --changed-only --format json 2>/dev/null)"
+if [ "$F" = "$G" ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: full and changed-only reports agree"; fi
+git add .
+expect_exit 1 "$(run check --changed-only)" "changed-only staged quoted filename"
+cd "$WORK" || exit 6
+
+# Source directory cycles fail promptly; excluded cycles are never traversed.
+if ln -s . "$WORK/changed/src/loop" 2>/dev/null; then
+  cd "$WORK/changed" || exit 6
+  "$KUJO" run "$FENCE" -- check > cycle-diagnostic.txt 2>&1
+  expect_exit 4 "$?" "directory symlink cycle fails closed"
+  case "$(cat cycle-diagnostic.txt)" in
+    *"source directory symlink cycle"*) PASS=$((PASS+1));;
+    *) FAIL=$((FAIL+1)); echo "FAIL: actionable directory cycle diagnostic";;
+  esac
+  rm src/loop
+  cd "$WORK" || exit 6
+fi
+# Machine baseline output must remain exactly one JSON object.
+"$KUJO" run "$FENCE" -- baseline create >/dev/null 2>&1
+"$KUJO" run "$FENCE" -- check --baseline --format json > baseline-report.json 2>/dev/null
+printf 'parse_json(read_file("baseline-report.json"))\n' > verify-report.kujo
+"$KUJO" run verify-report.kujo >/dev/null 2>&1
+expect_exit 0 "$?" "baseline report is valid JSON"
+# A failed output operation is an IO error, with the original file preserved.
+printf 'original\n' > output-parent
+expect_exit 5 "$(run check --output output-parent/child.json)" "output IO errors return 5"
+if [ "$(cat output-parent)" = original ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: output failure preserves existing file"; fi
+
+# Adapter failures cannot pass the check or rewrite adoption state.
+cd "$WORK/changed" || exit 6
+printf '%s\n' '{"version":1,"source_roots":["src"],"parser_adapters":{".ts":["git","--fence-invalid-option"]},"zones":{"all":{"paths":["src/**"]}}}' > fence.json
+expect_exit 4 "$(run check --format json)" "adapter failure makes scan incomplete"
+expect_exit 4 "$(run baseline create)" "incomplete scan refuses baseline"
+expect_exit 4 "$(run graph --observed)" "incomplete scan refuses observed graph"
+cd "$WORK" || exit 6
+
+# Package directory names are TOML data, including quotes and whitespace.
+mkdir -p "$WORK/quoted-workspace/packages/a \"name"
+printf '{}\n' > "$WORK/quoted-workspace/packages/a \"name/package.json"
+cd "$WORK/quoted-workspace" || exit 6
+expect_exit 0 "$(run workspace init)" "workspace safely quotes package names"
+expect_exit 0 "$(run validate)" "quoted workspace config validates"
+mkdir -p "$WORK/collision-workspace/packages/a-b" "$WORK/collision-workspace/packages/a.b"
+printf '{}\n' > "$WORK/collision-workspace/packages/a-b/package.json"
+printf '{}\n' > "$WORK/collision-workspace/packages/a.b/package.json"
+cd "$WORK/collision-workspace" || exit 6
+expect_exit 2 "$(run workspace init)" "workspace rejects normalized zone collision"
+if [ ! -e fence.toml ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: conflicting workspace config was written"; fi
+cd "$WORK" || exit 6
+
+# Resource failure is verified at the process boundary, including diagnostics.
+cd "$WORK/changed" || exit 6
+printf '%s\n' '{"version":1,"source_roots":["src"],"limits":{"max_imports":1},"zones":{"all":{"paths":["src/**"]}}}' > fence.json
+printf 'import x from "../database/users"\n' > src/ui/second.ts
+"$KUJO" run "$FENCE" -- check > budget-diagnostic.txt 2>&1
+expect_exit 4 "$?" "import budget interrupts check"
+case "$(cat budget-diagnostic.txt)" in
+  *"resource limit exceeded: max_imports"*) PASS=$((PASS+1));;
+  *) FAIL=$((FAIL+1)); echo "FAIL: actionable import-budget diagnostic";;
+esac
+cd "$WORK" || exit 6
+
 echo ""
 echo "CLI smoke: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] || exit 1

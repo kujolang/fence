@@ -1,0 +1,27 @@
+// Compare with the same script and runtime at the audit starting commit.
+// Measures traversal only: 100 selected files and 1,000 excluded vendor files.
+from src.walk import walk_profile
+let root = "tests/tmp/pruning-benchmark-" + uuid_v4()
+create_dir(root + "/keep")
+create_dir(root + "/vendor")
+mut i = 0
+mut dir = ""
+while i < 1100 {
+    dir = root + "/vendor"
+    if i < 100 { dir = root + "/keep" }
+    write_file(dir + "/file" + to_string(i) + ".ts", "export const x = 1", true)
+    i = i + 1
+}
+let measured = walk_profile([root], ["**/*.ts"], [root + "/vendor/**"])
+print(to_json_pretty({ "schema": "fence.pruning-benchmark/v1", "generated": 1100, "discovered": measured["discovered"], "selected": len(measured["files"]), "traversal_ms": measured["traversal_ms"], "filter_ms": measured["filter_ms"] }))
+mut j = 0
+mut cleanup_dir = ""
+while j < 1100 {
+    cleanup_dir = root + "/vendor"
+    if j < 100 { cleanup_dir = root + "/keep" }
+    delete_file(cleanup_dir + "/file" + to_string(j) + ".ts")
+    j = j + 1
+}
+os_rmdir(root + "/keep")
+os_rmdir(root + "/vendor")
+os_rmdir(root)

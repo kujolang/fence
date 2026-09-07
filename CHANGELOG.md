@@ -6,6 +6,25 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Repository hardening (2026-09-07)
+- Fixed changed-only scans with empty excludes and preserved quoted, Unicode,
+  and whitespace-containing Git paths using structured argv and NUL records.
+  Incomplete Git output now fails instead of silently omitting source files.
+- Pruned fully excluded subtrees, deduplicated identical roots, rejected directory
+  symlink cycles, and made directory traversal errors fatal.
+- Incomplete checks now return runtime exit 4 and failed status while retaining
+  skipped-file evidence; baseline and observed-graph generation refuse incomplete scans.
+- Made report/cache/baseline writes atomic and mapped write failures to IO exit 5.
+- Validated config containers and cache import records before use; hardened adapter
+  output checks and confined cache-file symlinks as well as its directory.
+- Fixed default-severity inheritance, omitted-file ignore matching, and mixed-language
+  resolution-cache identity. JSON/SARIF baseline reports remain a single JSON object.
+- Escaped generated workspace TOML and rejected normalized zone collisions before
+  writing; cycle witnesses now omit nodes merely downstream of a cycle.
+- Added cache and adapter modules to self-policy coverage, with an all-module gate.
+- Enforced import ceilings during analysis, pinned CI runtime source to the existing
+  v1.0.1 commit, and added behavioral and traversal regression gates.
+
 ### Enterprise hardening
 - Added opt-in output-root confinement and file/import/UTF-8 report resource
   limits with deterministic runtime failures.

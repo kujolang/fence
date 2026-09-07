@@ -126,11 +126,12 @@ export func cmd_check(parsed) {
     }
 
     if quiet == false {
-        if suppressed > 0 {
+        if suppressed > 0 && format != "json" && format != "sarif" {
             print("(" + to_string(suppressed) + " pre-existing violation(s) suppressed by baseline)")
         }
     }
 
+    if summary["skipped_files"] > 0 { return 4 }
     if summary["failing"] > 0 {
         return 1
     }
@@ -198,7 +199,7 @@ func is_scan_target(f, include, exclude) {
     if inc == false {
         return false
     }
-    if matches_list(f, exclude) {
+    if len(exclude) > 0 && matches_list(f, exclude) {
         return false
     }
     return true

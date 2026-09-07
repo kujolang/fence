@@ -11,7 +11,7 @@ export func ignore_match(v, entries) {
     while i < n {
         let entry = entries[i]
         if dict_get(entry, "expires", "") >= today {
-            if field_match(dict_get(entry, "from_zone", "*"), v["from_zone"]) && field_match(dict_get(entry, "to_zone", "*"), v["to_zone"]) && glob_match(dict_get(entry, "file", "**"), v["file"]) && field_match(dict_get(entry, "import", "*"), v["import"]) {
+            if field_match(dict_get(entry, "from_zone", "*"), v["from_zone"]) && field_match(dict_get(entry, "to_zone", "*"), v["to_zone"]) && file_match(dict_get(entry, "file", "**"), v["file"]) && field_match(dict_get(entry, "import", "*"), v["import"]) {
                 return { "ignored": true, "reason": dict_get(entry, "reason", ""), "expires": dict_get(entry, "expires", "") }
             }
         }
@@ -51,4 +51,9 @@ export func audit_ignores(entries, within_days, now_seconds) {
         i = i + 1
     }
     return { "schema_version": 1, "within_days": within_days, "active": active, "expiring": expiring, "expired": expired }
+}
+
+func file_match(pattern, file) {
+    if pattern == "*" || pattern == "**" { return true }
+    return glob_match(pattern, file)
 }

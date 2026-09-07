@@ -117,14 +117,13 @@ export func one_cycle(cfg) {
     mut guard = 0
     let limit = len(left) + 1
     while guard <= limit {
-        let outs = adj[current]
-        let nxt = first_in_set(outs, left)
+        let nxt = predecessor(adj, current, left)
         if nxt == "" {
             return path
         }
         if arr_has(path, nxt) {
             path = push(path, nxt)
-            return slice_from(path, nxt)
+            return reversed(slice_from(path, nxt))
         }
         path = push(path, nxt)
         current = nxt
@@ -133,17 +132,22 @@ export func one_cycle(cfg) {
     return path
 }
 
-// First element of `outs` that is also in `set`, or "".
-func first_in_set(outs, set) {
-    let n = len(outs)
+// Every Kahn remainder node has an incoming edge from the remainder. Walking
+// predecessors cannot get stuck on a sink that is merely blocked by a cycle.
+func predecessor(adj, current, nodes) {
     mut i = 0
-    while i < n {
-        if arr_has(set, outs[i]) {
-            return outs[i]
-        }
+    while i < len(nodes) {
+        if arr_has(adj[nodes[i]], current) { return nodes[i] }
         i = i + 1
     }
     return ""
+}
+
+func reversed(items) {
+    mut out = []
+    mut i = len(items) - 1
+    while i >= 0 { out = push(out, items[i]); i = i - 1 }
+    return out
 }
 
 // Return the sub-path starting at the first occurrence of `node`.

@@ -117,3 +117,10 @@ debt remains auditable.
 
 `0` success · `1` violations at/above `fail_on` · `2` invalid usage/config ·
 `3` parse error · `4` runtime · `5` IO · `6` internal.
+
+## Incomplete scans
+
+The existing `status` field is `failed` when `skipped_files` is nonempty, even
+with zero threshold-failing violations. The check exits `4`; the JSON and SARIF
+structures stay unchanged. Baseline suppression never appends prose to JSON or
+SARIF output. Consumers should always honor the process exit code.

@@ -31,8 +31,8 @@ flowchart LR
 The orchestration lives in `analyze.kujo` (`analyze_files`), driven by the
 command modules. Analysis maintains per-run import-resolution and zone-match
 caches. `check --cache` can persist import records keyed by source SHA-256,
-extractor version, and adapter fingerprint; stale or invalid entries are never
-accepted and do not affect report bytes.
+extractor version, and adapter fingerprint; digest/version-mismatched or malformed entries are re-extracted and do not affect
+report bytes. Cache contents remain trusted local state, not authenticated evidence.
 
 `graph --observed` reuses the pipeline to compare configured allowed edges with
 cross-zone internal edges actually found. Same-zone edges are omitted.

@@ -36,7 +36,7 @@ with `files × imports`, i.e. ~40–55 ms per file on this machine.
 ## Current optimizations
 
 - Import resolution is memoized per run. Repo-root, alias, and external imports
-  share a raw-import cache entry; relative and Rust module imports include the
+  share an extension-scoped raw-import cache entry; relative and Rust module imports include the
   importer path in the key so context-dependent resolution stays correct.
 - Zone classification is memoized by normalized repository path for both source
   files and resolved targets.
@@ -93,3 +93,14 @@ If a future change targets throughput (see `docs/ENHANCEMENTS.md`):
 - `normalize_sep` avoids allocation when a path has no backslash.
 - Reducing per-import function-call depth (the VM has notable call overhead) is
   likely the biggest lever; an AST/compiled fast path would be the largest.
+
+## September 2026 hardening measurements
+
+See [the audit](audits/repository-hardening.md) for raw receipts and limitations.
+`kujo run benchmarks/pruning_benchmark.kujo` generates 100 selected files and
+1,000 excluded vendor files. Conservative subtree pruning reduced collected
+paths from 1,100 to 100 with unchanged selected files. Measured traversal plus
+filtering was 27.27 s before and 2.16 s after on a concurrently loaded host.
+The deterministic collected-path assertion is the CI ratchet; timing is not a
+portable threshold. The separate 1,600-file scan retained 1,601 files, 1,600
+imports, zero violations, and the same resolution/zone cache counters.

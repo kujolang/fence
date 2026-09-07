@@ -5,8 +5,8 @@ from src.paths import is_safe_output, normalize_sep, parent_dir
 
 // Write `content` to `path` after enforcing path safety.
 // Returns { ok: bool, error: string }. Never overwrites silently unless
-// `allow_overwrite` is true (Kujo's write_file errors if the file exists, so we
-// remove it first only when overwrite is permitted).
+// `allow_overwrite` is true. Atomic publication preserves an existing file
+// when writing fails and never exposes a partially written report.
 export func write_safe(path, content, allow_overwrite) {
     if is_safe_output(path) == false {
         return { "ok": false, "error": "unsafe output path: " + path }
@@ -26,17 +26,15 @@ export func write_safe(path, content, allow_overwrite) {
         if allow_overwrite == false {
             return { "ok": false, "error": "refusing to overwrite existing file: " + p }
         }
-        delete_file(p)
     }
 
-    let dir = parent_dir(p)
-    if dir != "" {
-        if path_is_dir(dir) == false {
-            create_dir(dir)
-        }
+    try {
+        let dir = parent_dir(p)
+        if dir != "" && path_is_dir(dir) == false { create_dir(dir) }
+        write_file_atomic(p, content, allow_overwrite)
+    } except e {
+        return { "ok": false, "error": "cannot write output file: " + p }
     }
-
-    write_file(p, content)
     return { "ok": true, "error": "" }
 }
 

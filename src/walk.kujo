@@ -1,9 +1,8 @@
 // src/walk.kujo
 // Recursive-by-iteration file traversal for Fence.
 //
-// Tree walks are done with an explicit stack (no recursion and no helper calls
-// inside the loop) because Kujo's VM can corrupt loop state when a recursive
-// function is called from within a loop body. Only builtins run in the hot loop.
+// An explicit stack avoids recursive traversal and detects directory symlink
+// cycles. Only exclusions that cover a complete subtree prune traversal.
 
 from src.glob import glob_match_any
 from src.util import sort_strings, arr_has
@@ -14,12 +13,12 @@ from src.paths import file_ext
 //
 // Returns a sorted array of paths (deterministic order).
 export func walk(source_roots, include_patterns, exclude_patterns) {
-    return filter_files(collect_files(source_roots), include_patterns, exclude_patterns)
+    return filter_files(collect_files(source_roots, exclude_patterns), include_patterns, exclude_patterns)
 }
 
 export func walk_profile(source_roots, include_patterns, exclude_patterns) {
     let traversal_started = performance_now()
-    let discovered = collect_files(source_roots)
+    let discovered = collect_files(source_roots, exclude_patterns)
     let traversal_ms = performance_now() - traversal_started
     let filter_started = performance_now()
     let files = filter_files(discovered, include_patterns, exclude_patterns)
@@ -27,8 +26,10 @@ export func walk_profile(source_roots, include_patterns, exclude_patterns) {
     return { "files": files, "discovered": len(discovered), "traversal_ms": traversal_ms, "filter_ms": filter_ms }
 }
 
-func collect_files(source_roots) {
+func collect_files(source_roots, exclude_patterns) {
     mut found = []
+    mut seen_paths = {}
+    let prunable = subtree_excludes(exclude_patterns)
 
     // Seed the stack with existing source roots.
     mut stack = []
@@ -37,24 +38,26 @@ func collect_files(source_roots) {
     while ri < rn {
         let root = source_roots[ri]
         if path_is_dir(root) {
-            stack = push(stack, root)
+            stack = push(stack, { "path": root, "ancestors": [] })
         }
         ri = ri + 1
     }
 
-    // Iterative depth-first walk. Only builtins are used inside this loop.
+    // Iterative depth-first walk with ancestor identity tracking.
     while len(stack) > 0 {
         let popped = pop(stack)
         stack = popped[0]
-        let dir = popped[1]
+        let frame = popped[1]
+        let dir = frame["path"]
+        if has_key(seen_paths, dir) == 1 { continue }
+        seen_paths[dir] = true
+        if glob_match_any(prunable, dir) { continue }
+        let canonical = path_absolute(dir)
+        if arr_has(frame["ancestors"], canonical) { throw("source directory symlink cycle: " + dir) }
+        let ancestors = push(frame["ancestors"], canonical)
 
-        // An unreadable directory (permissions) is skipped, not fatal.
-        mut entries = []
-        try {
-            entries = list_dir(dir)
-        } except e {
-            entries = []
-        }
+        // An incomplete traversal must fail rather than report a clean scan.
+        let entries = list_dir(dir)
         let en = len(entries)
         mut ei = 0
         while ei < en {
@@ -65,8 +68,8 @@ func collect_files(source_roots) {
                 // skip
             } else {
                 if path_is_dir(full) {
-                    stack = push(stack, full)
-                } else {
+                    stack = push(stack, { "path": full, "ancestors": ancestors })
+                } else if path_is_file(full) {
                     found = push(found, full)
                 }
             }
@@ -135,4 +138,23 @@ func is_included(f, include_patterns) {
         return true
     }
     return glob_match_any(include_patterns, f)
+}
+
+// Keep only literal subtree exclusions, optionally prefixed by **/. General
+// globs still filter files; they must never prune a possibly included child.
+func subtree_excludes(patterns) {
+    mut out = []
+    mut i = 0
+    while i < len(patterns) {
+        let normalized = replace(patterns[i], "\\", "/")
+        if ends_with(normalized, "/**") {
+            mut prefix = substring(normalized, 0, len(normalized) - 3)
+            if starts_with(prefix, "**/") { prefix = substring(prefix, 3, len(prefix)) }
+            if prefix != "" && contains(prefix, "*") == 0 && contains(prefix, "?") == 0 {
+                out = push(out, normalized)
+            }
+        }
+        i = i + 1
+    }
+    return out
 }

@@ -79,7 +79,10 @@ severity = "error"
 ## `[limits]`
 
 All limits default to `0` (unlimited). Exceeding one fails with runtime exit `4`
-before a report is written.
+before a report is written. File limits apply after selection, import limits
+during analysis, and report limits after rendering. These are enforcement
+ceilings, not bounds on directory traversal, individual source/adapter/cache
+payload allocation, or total process memory.
 
 | Key | Meaning |
 | --- | --- |
@@ -123,7 +126,10 @@ reviewed configuration and pin their installation outside Fence.
 | Key | Type | Meaning |
 | --- | --- | --- |
 | `include` | string[] | Glob patterns a file must match to be scanned. Empty = include all. |
-| `exclude` | string[] | Glob patterns that remove files from scanning. `.git` is always skipped. |
+| `exclude` | string[] | Glob patterns that remove files from scanning. `.git` is always skipped. Fully excluded literal subtrees are pruned before
+reading their contents; other globs still filter individual files. Identical
+source roots are visited once. Directory symlink cycles and unreadable
+directories fail the scan; non-file special entries are not read. |
 
 Glob support is pragmatic: `**/*.ext` (suffix), `prefix/**` (tree),
 `prefix/**/*.ext`, `?` for one character, and one or more `*` within a path
@@ -183,3 +189,6 @@ Override per-run with `check --fail-on <level>`.
 `unknown_dependency_policy` / severities, missing zones, references to undefined
 zones, allow/deny conflicts, zones with no paths, **overlapping zone paths**,
 **dependency cycles** in allowed edges, and unsupported `version`.
+
+Malformed container types (including zones, scan lists, and aliases) are rejected
+while loading config, with a config error instead of a later runtime exception.

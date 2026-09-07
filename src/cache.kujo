@@ -41,7 +41,7 @@ export func cached_imports(file, adapters, cache) {
     mut entries = cache["entries"]
     if dict_has(entries, file) {
         let entry = entries[file]
-        if dict_get(entry, "sha256", "") == digest && type_of(dict_get(entry, "imports", 0)) == "array" {
+        if valid_cache_entry(entry, digest) {
             return { "result": { "ok": true, "imports": entry["imports"], "error": "", "file": file, "detector": "cache" }, "cache": cache, "hit": true }
         }
     }
@@ -65,8 +65,31 @@ func cache_directory_safe() {
     mut cwd = ""
     try {
         absolute = normalize_sep(path_absolute(".fence"))
+        if file_exists(cache_path()) { absolute = normalize_sep(path_absolute(cache_path())) }
         cwd = normalize_sep(path_absolute("."))
     } except e { return false }
     if absolute == cwd { return true }
     return starts_with(absolute, cwd + "/")
+}
+
+// Cache JSON is disposable input, not a trusted typed import array. Corruption
+// falls back to extraction rather than crashing or changing rule evaluation.
+func valid_cache_entry(entry, digest) {
+    if type_of(entry) != "dict" { return false }
+    if dict_get(entry, "sha256", "") != digest { return false }
+    let items = dict_get(entry, "imports", 0)
+    if type_of(items) != "array" { return false }
+    mut i = 0
+    while i < len(items) {
+        let item = items[i]
+        if type_of(item) != "dict" { return false }
+        if type_of(dict_get(item, "path", 0)) != "string" || type_of(dict_get(item, "line", 0)) != "int" { return false }
+        if item["line"] < 1 { return false }
+        if type_of(dict_get(item, "kind", 0)) != "string" || type_of(dict_get(item, "raw", 0)) != "string" { return false }
+        let confidence = dict_get(item, "confidence", "")
+        if confidence != "exact" && confidence != "best_effort" { return false }
+        if type_of(dict_get(item, "detector", 0)) != "string" { return false }
+        i = i + 1
+    }
+    return true
 }

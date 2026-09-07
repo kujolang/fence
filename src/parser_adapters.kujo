@@ -27,7 +27,7 @@ export func run_adapter(file, argv) {
     }
     command = push(command, file)
     let result = spawn_process(command, { "timeout_ms": 30000, "max_output_bytes": 4194304 })
-    if result.exitcode != 0 {
+    if result.success == false || result.stdout_truncated {
         return { "ok": false, "imports": [], "error": "parser adapter failed for " + file }
     }
     mut parsed = {}
@@ -50,6 +50,9 @@ func normalize_adapter_imports(items) {
         let item = items[i]
         if type_of(item) != "dict" || type_of(dict_get(item, "path", 0)) != "string" || type_of(dict_get(item, "line", 0)) != "int" || item["line"] < 1 {
             return { "ok": false, "imports": [], "error": "parser adapter returned an invalid import record" }
+        }
+        if type_of(dict_get(item, "kind", "import")) != "string" || type_of(dict_get(item, "raw", item["path"])) != "string" {
+            return { "ok": false, "imports": [], "error": "parser adapter kind and raw must be strings" }
         }
         out = push(out, {
             "kind": dict_get(item, "kind", "import"),

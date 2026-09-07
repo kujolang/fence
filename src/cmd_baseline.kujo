@@ -40,6 +40,10 @@ export func cmd_baseline(parsed) {
 
     let files = walk(cfg["source_roots"], cfg["include"], cfg["exclude"])
     let result = analyze_files(files, cfg)
+    if len(result["skipped_files"]) > 0 {
+        print("Error: incomplete source analysis; baseline was not changed.")
+        return 4
+    }
     mut obj = baseline_from_result(result)
     mut pruned_count = 0
     if sub == "prune" {

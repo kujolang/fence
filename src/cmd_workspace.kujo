@@ -16,6 +16,11 @@ export func cmd_workspace(parsed) {
         return 2
     }
     let content = render_workspace(packages, apps)
+    // Generated TOML must be valid before any existing file can be touched.
+    try { parse_toml(content) } except e {
+        print("Error: workspace package names produce conflicting zone names.")
+        return 2
+    }
     let written = write_safe("fence.toml", content, false)
     if written["ok"] == false {
         print("Error: " + written["error"])
@@ -60,7 +65,7 @@ func package_zone_names(packages) {
     mut out = []
     mut i = 0
     while i < n {
-        out = push(out, "\"" + zone_name("pkg", packages[i]) + "\"")
+        out = push(out, to_json(zone_name("pkg", packages[i])))
         i = i + 1
     }
     return "[" + join_strings(out, ", ") + "]"
@@ -71,7 +76,7 @@ func app_zone_names(apps) {
     mut out = []
     mut i = 0
     while i < n {
-        out = push(out, "\"" + zone_name("app", apps[i]) + "\"")
+        out = push(out, to_json(zone_name("app", apps[i])))
         i = i + 1
     }
     return "[" + join_strings(out, ", ") + "]"
@@ -86,14 +91,14 @@ func render_workspace(packages, apps) {
     mut pi = 0
     while pi < pn {
         let pz = zone_name("pkg", packages[pi])
-        o = o + "[zones." + pz + "]\npaths = [\"packages/" + packages[pi] + "/**\"]\ncan_depend_on = " + pkg_all + "\ncannot_depend_on = " + app_all + "\nseverity = \"error\"\n\n"
+        o = o + "[zones." + to_json(pz) + "]\npaths = [" + to_json("packages/" + packages[pi] + "/**") + "]\ncan_depend_on = " + pkg_all + "\ncannot_depend_on = " + app_all + "\nseverity = \"error\"\n\n"
         pi = pi + 1
     }
     let an = len(apps)
     mut ai = 0
     while ai < an {
         let az = zone_name("app", apps[ai])
-        o = o + "[zones." + az + "]\npaths = [\"apps/" + apps[ai] + "/**\"]\ncan_depend_on = " + pkg_all + "\ncannot_depend_on = []\nseverity = \"error\"\n\n"
+        o = o + "[zones." + to_json(az) + "]\npaths = [" + to_json("apps/" + apps[ai] + "/**") + "]\ncan_depend_on = " + pkg_all + "\ncannot_depend_on = []\nseverity = \"error\"\n\n"
         ai = ai + 1
     }
     return o

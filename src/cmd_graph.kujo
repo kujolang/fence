@@ -9,6 +9,7 @@ from src.cycles import one_cycle
 from src.util import join_strings
 from src.walk import walk
 from src.analyze import analyze_files
+from src.validate import validate_config, count_errors
 
 export func cmd_graph(parsed) {
     let flags = parsed["flags"]
@@ -23,6 +24,7 @@ export func cmd_graph(parsed) {
     }
 
     let cfg = loaded["config"]
+    if count_errors(validate_config(cfg)) > 0 { print("Config is invalid. Run validate for details."); return 2 }
 
     // `graph --cycles` reports dependency cycles instead of the full graph.
     if has_flag(flags, "cycles") {
@@ -40,6 +42,7 @@ export func cmd_graph(parsed) {
     if has_flag(flags, "observed") {
         let observed_files = walk(cfg["source_roots"], cfg["include"], cfg["exclude"])
         let observed_result = analyze_files(observed_files, cfg)
+        if len(observed_result["skipped_files"]) > 0 { print("Error: incomplete source analysis; observed graph is unavailable."); return 4 }
         g = render_observed_graph(cfg, observed_result["observed_edges"], format)
     }
     if g["ok"] == false {

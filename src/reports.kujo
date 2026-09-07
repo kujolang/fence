@@ -61,7 +61,7 @@ export func summarize(result, cfg) {
     }
 
     mut status = "passed"
-    if failing > 0 {
+    if failing > 0 || len(dict_get(result, "skipped_files", [])) > 0 {
         status = "failed"
     }
 
@@ -414,6 +414,7 @@ func md_fixes(viols) {
 
 func md_handoff(summary, viols) {
     mut o = ""
+    if summary["skipped_files"] > 0 { return "Fence could not analyze every selected file. Resolve the skipped-file errors and rerun the check.\n" }
     if summary["failing"] == 0 {
         o = o + "Fence found no boundary violations at the configured threshold.\n"
         return o

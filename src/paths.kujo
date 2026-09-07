@@ -1,10 +1,8 @@
 // src/paths.kujo
 // Conservative path-safety helpers for Fence.
 //
-// Kujo does not expose a guaranteed canonical-path resolver in the local VM
-// runtime, so output writes use conservative textual checks instead of
-// realpath: reject absolute paths, `~`, empty paths, and any `..` segment.
-// This keeps writes inside the working tree.
+// Textual checks reject absolute paths, `~`, empty paths, and `..` segments.
+// output.kujo additionally checks the canonical nearest existing ancestor.
 
 // Normalize separators to `/` so checks are consistent across platforms.
 // Avoids allocating a new string in the common (POSIX, no-backslash) case.
@@ -54,7 +52,7 @@ export func safe_output_path(path) {
     if is_safe_output(path) {
         return normalize_sep(path)
     }
-    throw "unsafe output path: " + path
+    throw("unsafe output path: " + path)
 }
 
 // Compute a repo-relative display path. Since Fence runs from the repo root and

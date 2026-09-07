@@ -74,6 +74,7 @@ export func analyze_files(files, cfg) {
         while mi < mc {
             let imp = imps[mi]
             imports_checked = imports_checked + 1
+            if cfg["max_imports"] > 0 && imports_checked > cfg["max_imports"] { throw("resource limit exceeded: max_imports") }
             // Only files that belong to a known zone are governed.
             if file_zone != "unknown" {
                 let cache_key = resolution_key(imp["path"], file)
@@ -234,9 +235,9 @@ func zone_owner(cfg, zone) {
 // resolve identically within one run because roots and aliases are immutable.
 func resolution_key(raw, file) {
     if starts_with(raw, ".") || file_ext(file) == ".rs" {
-        return file + "|" + raw
+        return to_json([file, raw])
     }
-    return raw
+    return to_json([file_ext(file), raw])
 }
 
 func cached_zone_result(path, zones, zone_names, cache) {

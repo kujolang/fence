@@ -33,10 +33,12 @@ from src.graph import render_graph_json, render_graph_dot, render_graph_human
 from src.walk import walk
 from src.meta import no_config_text
 from src.output import output_root_allowed
-from src.walk import include_extensions
+from src.walk import include_extensions, walk_profile
 from src.graph import render_observed_graph
 from src.ignores import ignore_match, audit_ignores
 from src.parser_adapters import run_adapter
+from src.cache import cached_imports, empty_cache
+from src.output import write_safe
 
 mut g_pass = 0
 mut g_fail = 0
@@ -381,6 +383,97 @@ ok("config composition inherits zone", has_key(composed["raw"]["zones"], "base")
 ok("config composition child overrides", has_key(composed["raw"]["zones"], "child"))
 ok("config composition cycle rejected", load_composed("tests/config_composition/cycle-a.toml", [], 0)["ok"] == false)
 ok("config composition path escape rejected", load_composed("tests/config_composition/escape.toml", [], 0)["ok"] == false)
+
+
+// Hardening regressions: defaults, cache corruption, atomic failure semantics.
+let default_warning_cfg = normalize_config({ "default_severity": "warning", "zones": { "ui": { "paths": ["src/**"] } } })
+eq("zone inherits default severity", default_warning_cfg["zones"]["ui"]["severity"], "warning")
+ok("omitted ignore file matches nested paths", ignore_match(fake_result["violations"][0], [{ "reason": "migration", "expires": "2999-01-01" }])["ignored"])
+let malformed_cache_file = "tests/conformance/v1/javascript.ts"
+mut malformed_cache = empty_cache({})
+malformed_cache["entries"] = {}
+mut malformed_entries = {}
+malformed_entries[malformed_cache_file] = { "sha256": sha256_file(malformed_cache_file), "imports": [7] }
+malformed_cache["entries"] = malformed_entries
+eq("corrupt cache fixture populated", len(malformed_cache["entries"][malformed_cache_file]["imports"]), 1)
+let repaired_cache = cached_imports(malformed_cache_file, {}, malformed_cache)
+ok("malformed cache import is a miss", repaired_cache["hit"] == false)
+ok("malformed cache is re-extracted", repaired_cache["result"]["ok"])
+let atomic_test_path = "tests/tmp/atomic-hardening.txt"
+ok("atomic output initial write", write_safe(atomic_test_path, "original", true)["ok"])
+ok("atomic output refuses overwrite", write_safe(atomic_test_path, "replacement", false)["ok"] == false)
+eq("refused output preserves original", read_file(atomic_test_path), "original")
+ok("atomic output replacement", write_safe(atomic_test_path, "replacement", true)["ok"])
+eq("atomic output replacement contents", read_file(atomic_test_path), "replacement")
+ok("output IO failure is structured", write_safe(atomic_test_path + "/child", "no", true)["ok"] == false)
+eq("failed child output preserves parent", read_file(atomic_test_path), "replacement")
+delete_file(atomic_test_path)
+
+
+// Traversal only prunes exclusions proven to cover the whole subtree.
+create_dir("tests/tmp/walk-hardening/keep")
+create_dir("tests/tmp/walk-hardening/vendor")
+write_file("tests/tmp/walk-hardening/keep/a.ts", "export const a = 1", true)
+write_file("tests/tmp/walk-hardening/vendor/b.ts", "export const b = 1", true)
+let pruned_walk = walk_profile(["tests/tmp/walk-hardening"], ["**/*.ts"], ["tests/tmp/walk-hardening/vendor/**"])
+eq("pruned subtree is never collected", pruned_walk["discovered"], 1)
+eq("pruned subtree keeps selected file", pruned_walk["files"], ["tests/tmp/walk-hardening/keep/a.ts"])
+let partial_walk = walk_profile(["tests/tmp/walk-hardening"], ["**/*.ts"], ["**/*.js"])
+eq("file-only exclusion does not prune directory", partial_walk["discovered"], 2)
+let duplicate_walk = walk(["tests/tmp/walk-hardening", "tests/tmp/walk-hardening"], ["**/*.ts"], [])
+eq("duplicate roots do not duplicate findings", len(duplicate_walk), 2)
+delete_file("tests/tmp/walk-hardening/keep/a.ts")
+delete_file("tests/tmp/walk-hardening/vendor/b.ts")
+os_rmdir("tests/tmp/walk-hardening/keep")
+os_rmdir("tests/tmp/walk-hardening/vendor")
+os_rmdir("tests/tmp/walk-hardening")
+
+
+let bad_shapes = [{ "zones": [] }, { "scan": 7 }, { "source_roots": "src" }, { "zones": { "all": { "paths": [7] } } }, { "aliases": { "@": false } }, { "ignores": {} }]
+mut bad_shape_i = 0
+while bad_shape_i < len(bad_shapes) {
+    write_file("tests/tmp/bad-shape.json", to_json(bad_shapes[bad_shape_i]), true)
+    ok("malformed config shape rejected " + to_string(bad_shape_i), load_composed("tests/tmp/bad-shape.json", [], 0)["ok"] == false)
+    bad_shape_i = bad_shape_i + 1
+}
+delete_file("tests/tmp/bad-shape.json")
+
+
+mut incomplete_result = fake_result
+incomplete_result["violations"] = []
+incomplete_result["skipped_files"] = [{ "file": "unreadable.ts", "reason": "unreadable source file" }]
+eq("incomplete scan cannot pass", summarize(incomplete_result, cfg)["status"], "failed")
+
+
+// Every shipped implementation module must be governed by Fence's own policy.
+let self_cfg = normalize_config(load_composed("fence.toml", [], 0)["raw"])
+let self_sources = walk(["src"], ["src/**/*.kujo"], [])
+mut self_source_i = 0
+while self_source_i < len(self_sources) {
+    ok("self policy covers " + self_sources[self_source_i], match_zone(self_sources[self_source_i], self_cfg["zones"], self_cfg["zone_names"]) != "unknown")
+    self_source_i = self_source_i + 1
+}
+
+
+let sink_cycle_cfg = normalize_config({ "zones": { "a_sink": { "paths": ["sink/**"] }, "b": { "paths": ["b/**"], "can_depend_on": ["a_sink", "c"] }, "c": { "paths": ["c/**"], "can_depend_on": ["b"] } } })
+let concrete_cycle = one_cycle(sink_cycle_cfg)
+eq("cycle with alphabetically first downstream sink closes", concrete_cycle[0], concrete_cycle[len(concrete_cycle) - 1])
+eq("cycle omits downstream sink", arr_has(concrete_cycle, "a_sink"), false)
+
+
+// Identical module strings may resolve differently in Go and TypeScript.
+create_dir("tests/tmp/mixed/client")
+write_file("tests/tmp/mixed/target.ts", "export const target = 1", true)
+write_file("tests/tmp/mixed/client/a.ts", "import x from \"example.com/acme/target\"", true)
+write_file("tests/tmp/mixed/client/b.go", "import \"example.com/acme/target\"", true)
+let mixed_cfg = normalize_config({ "source_roots": ["tests/tmp/mixed"], "go_module": "example.com/acme", "zones": { "client": { "paths": ["tests/tmp/mixed/client/**"], "cannot_depend_on": ["target"] }, "target": { "paths": ["tests/tmp/mixed/target.ts"] } } })
+let mixed_result = analyze_files(["tests/tmp/mixed/client/a.ts", "tests/tmp/mixed/client/b.go"], mixed_cfg)
+eq("Go resolution is not poisoned by TypeScript cache", len(mixed_result["violations"]), 1)
+delete_file("tests/tmp/mixed/client/a.ts")
+delete_file("tests/tmp/mixed/client/b.go")
+delete_file("tests/tmp/mixed/target.ts")
+os_rmdir("tests/tmp/mixed/client")
+os_rmdir("tests/tmp/mixed")
 
 // ---- summary ----
 print("")

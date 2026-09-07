@@ -16,19 +16,26 @@ Fence is local-first and minimizes its trust surface by design:
 - **Path-safe writes.** File output (`init`, `--output`, `baseline create`) is
   restricted to the working directory: absolute paths, `~`, `..`, and
   drive-letter paths are rejected, and a symlinked parent that would escape the
-  tree is rejected via canonical-ancestor resolution.
+  tree is rejected via canonical-ancestor resolution. Atomic publication preserves
+  existing output on write failure. Confinement checks and publication are separate
+  operations: a hostile concurrent process can race ancestor replacement. Use
+  OS isolation for repositories writable by an adversary during a scan.
 - **No secret exposure.** Fence does not print file contents (only import lines
   and paths) and does not read or log environment secrets.
 - **Optional output confinement.** Enterprises can restrict `--output` to
   configured repo-relative `output_roots`.
 - **Resource ceilings.** Optional file, import, and UTF-8 report-byte limits
-  bound work on hostile or accidentally huge repositories.
+  reject over-budget checks. Selection and rendering still allocate before their
+  respective checks; these settings do not provide a process-memory sandbox.
 - **Auditable exceptions.** Structured ignores require a reason and expiry and
   remain visible in machine reports.
 - **Confined composition.** `extends` is local-only, depth/cycle limited, and
   rejects traversal, absolute paths, and symlink escapes.
 - **Confined cache.** The optional `.fence` cache rejects symlinked-directory
-  escapes and never stores source content, only source digests and import records.
+  escapes, including a cache-file symlink, and validates import-record shapes.
+  It stores source digests and import records, not complete files. The cache is
+  trusted local acceleration data, not authenticated evidence: a writer can forge
+  a structurally valid entry. Omit `--cache` for adversary-writable cache state.
 
 ## Supported versions
 

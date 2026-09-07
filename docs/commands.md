@@ -49,7 +49,10 @@ kujo run fence.kujo -- check --quiet
 | `--summary-only` | Print only the summary line (no violation list) |
 | `--no-color` | Accepted for CI compatibility (output is already plain) |
 
-Exit `0` when clean at the threshold, `1` when violations reach it.
+Exit `0` when clean at the threshold, `1` when violations reach it. An incomplete
+scan returns `4`, even with `--fail-on none`; check reports retain skipped-file
+details and use failed status. Directory cycles or traversal failures abort the
+scan. Baseline and observed-graph generation refuse incomplete analysis.
 The `--base` value must be a shell-safe, unambiguous Git ref and may not start
 with `-`. Revision ranges, reflog selectors, repeated slashes, `.lock` suffixes,
 and trailing dots/slashes are rejected before Git runs.
@@ -95,6 +98,9 @@ Record current violations so an existing repo can adopt Fence gradually.
 kujo run fence.kujo -- baseline create     # writes fence-baseline.json
 ```
 
+JSON and SARIF remain a single JSON object when suppression occurs; no prose
+footer is appended. Human and Markdown output retain the suppression receipt.
+
 Then run `check --baseline` to suppress those exact violations; any **new**
 violation still fails. Commit `fence-baseline.json` and shrink it over time.
 
@@ -105,7 +111,8 @@ in a full current scan and prints removed/remaining counts.
 
 `kujo run fence.kujo -- workspace init` discovers direct children of `apps/`
 and `packages/` with common local manifests and generates one deterministic zone
-per package. It refuses to overwrite an existing `fence.toml`.
+per package. Names are quoted as TOML data; names that normalize to the same
+zone cause exit `2` before writing. It refuses to overwrite an existing `fence.toml`.
 
 ## `ignores list` / `ignores check`
 
