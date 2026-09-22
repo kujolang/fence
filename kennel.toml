@@ -17,7 +17,7 @@ public_api = true
 notes = "Stable v1 CLI, configuration, JSON, and SARIF contracts for local and CI enforcement."
 
 [kujo]
-minimum_version = "1.0.1"
+minimum_version = "1.4.0"
 entry = "fence.kujo"
 sources = ["src", "."]
 includes = ["README.md", "LICENSE", "CHANGELOG.md", "SECURITY.md", "docs", "examples", "tests", "scripts", "benchmarks"]
