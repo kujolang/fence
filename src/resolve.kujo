@@ -36,7 +36,9 @@ func is_rel_slash(raw) {
 
 // Normalize a path containing `.`/`..` segments into a clean repo path.
 func join_path(dir, rel) {
-    let combined = dir + "/" + rel
+    mut combined = rel
+    if dir != "" { combined = dir + "/" + rel }
+    let rooted = starts_with(normalize_sep(combined), "/")
     let segs = split(normalize_sep(combined), "/")
     let n = len(segs)
     mut stack = []
@@ -50,9 +52,11 @@ func join_path(dir, rel) {
                 // skip
             } else {
                 if s == ".." {
-                    if len(stack) > 0 {
+                    if len(stack) > 0 && stack[len(stack) - 1] != ".." {
                         let popped = pop(stack)
                         stack = popped[0]
+                    } else if rooted == false {
+                        stack = push(stack, "..")
                     }
                 } else {
                     stack = push(stack, s)
@@ -61,7 +65,9 @@ func join_path(dir, rel) {
         }
         i = i + 1
     }
-    return join_segs(stack)
+    let joined = join_segs(stack)
+    if rooted { return "/" + joined }
+    return joined
 }
 
 func join_segs(segs) {
@@ -80,7 +86,13 @@ func join_segs(segs) {
 
 // Try a base path against known extensions and directory-index files.
 // Returns the resolved repo path, or "" if nothing exists.
-export func try_candidates(base) {
+export func try_candidates(raw_base) {
+    // Filesystem lookup and zone matching must share the same lexical identity.
+    // Alias and direct imports may contain dot segments, just like relatives.
+    mut base = raw_base
+    if contains(base, "/.") == 1 || starts_with(base, ".") || contains(base, "//") == 1 || contains(base, "\\") == 1 {
+        base = join_path("", base)
+    }
     if base == "" {
         return ""
     }

@@ -12,7 +12,7 @@
 
 from src.glob import glob_match, glob_match_any
 from src.paths import is_safe_output, file_ext, parent_dir, base_name
-from src.util import arr_has, sort_strings, join_strings, truthy, utf8_byte_length
+from src.util import arr_has, sort_strings, join_strings, truthy, utf8_byte_length, display_text
 from src.config import normalize_config, load_composed
 from src.validate import validate_config, count_errors
 from src.imports import extract_for_ext, detect_imports_result
@@ -530,6 +530,78 @@ eq("summary omits unused body", render_for_flags(fake_result, summary, "fence.to
 eq("quiet validates format", render_for_flags(fake_result, summary, "fence.toml", "invalid", { "quiet": "true" }, 0)["ok"], false)
 eq("quiet output preserves report", render_for_flags(fake_result, summary, "fence.toml", "json", { "quiet": "true", "output": "out.json" }, 0)["text"], render_json(fake_result, summary, "fence.toml"))
 eq("quiet ceiling measures report", render_for_flags(fake_result, summary, "fence.toml", "json", { "quiet": "true" }, 1)["text"], render_json(fake_result, summary, "fence.toml"))
+
+// Audit regressions: invalid exceptions must never reach matching/date parsing.
+let invalid_exceptions = [
+    { "reason": "migration", "expires": "2999-99-99" },
+    { "reason": "migration", "expires": "2100-02-29" },
+    { "reason": 42, "expires": "2999-01-01" },
+    { "reason": "migration", "expires": "2999-01-01", "file": 42 },
+    { "reason": "migration", "expires": "2999-01-01", "from_zone": [] }
+]
+mut audit_i = 0
+while audit_i < len(invalid_exceptions) {
+    let invalid_ignore_cfg = normalize_config({ "zones": { "all": { "paths": ["src/**"] } }, "ignores": [invalid_exceptions[audit_i]] })
+    ok("invalid exception rejected " + to_string(audit_i), count_errors(validate_config(invalid_ignore_cfg)) > 0)
+    audit_i = audit_i + 1
+}
+let leap_ignore_cfg = normalize_config({ "zones": { "all": { "paths": ["src/**"] } }, "ignores": [{ "reason": "migration", "expires": "2400-02-29" }] })
+eq("real leap date accepted", count_errors(validate_config(leap_ignore_cfg)), 0)
+
+// Limits apply to analysis callers and the total across sequential shards.
+write_file("tests/tmp/budget-a.ts", "import a from \"one\"", true)
+write_file("tests/tmp/budget-b.ts", "import b from \"two\"", true)
+let budget_files = ["tests/tmp/budget-a.ts", "tests/tmp/budget-b.ts"]
+mut budget_cfg = normalize_config({ "zones": { "all": { "paths": ["tests/tmp/**"] } }, "limits": { "max_files": 1 } })
+mut files_rejected = false
+try { analyze_files(budget_files, budget_cfg) } except e { files_rejected = true }
+ok("analysis enforces file ceiling", files_rejected)
+mut shard_files_rejected = false
+try { analyze_sharded(budget_files, budget_cfg, 2) } except e { shard_files_rejected = true }
+ok("shards enforce total file ceiling", shard_files_rejected)
+budget_cfg["max_files"] = 0
+budget_cfg["max_imports"] = 1
+mut imports_rejected = false
+try { analyze_sharded(budget_files, budget_cfg, 2) } except e { imports_rejected = true }
+ok("shards enforce total import ceiling", imports_rejected)
+budget_cfg["max_imports"] = 2
+eq("exact shard budget accepted", analyze_sharded(budget_files, budget_cfg, 2)["imports_checked"], 2)
+delete_file("tests/tmp/budget-a.ts")
+delete_file("tests/tmp/budget-b.ts")
+
+// Baseline indexing preserves duplicate suppression and prune semantics.
+let repeated_result = { "files_scanned": 1, "imports_checked": 2, "zone_files": {}, "violations": [fake_result["violations"][0], fake_result["violations"][0]] }
+let repeated_fp = fingerprint(fake_result["violations"][0])
+eq("baseline creation deduplicates", baseline_from_result(repeated_result)["fingerprints"], [repeated_fp])
+eq("baseline suppresses each occurrence", apply_baseline(repeated_result, [repeated_fp, repeated_fp])["suppressed"], 2)
+eq("prune preserves duplicate existing entries", prune_baseline(repeated_result, [repeated_fp, "stale", repeated_fp])["baseline"]["fingerprints"], [repeated_fp, repeated_fp])
+eq("prune reports stale entries", prune_baseline(repeated_result, [repeated_fp, "stale"])["removed"], ["stale"])
+
+// Candidate identity must match the file actually opened by the filesystem.
+let alias_dot = resolve_import("@/ui/../database/users", "tests/fixtures/sample/src/ui/Login.tsx", ["tests/fixtures/sample/src"], { "@": "tests/fixtures/sample/src" })
+eq("alias dot segments normalized", alias_dot["resolved"], "tests/fixtures/sample/src/database/users.ts")
+let direct_dot = resolve_import("tests/fixtures/sample/src/ui/../database/users", "tests/fixtures/sample/src/ui/Login.tsx", ["tests/fixtures/sample/src"], {})
+eq("direct dot segments normalized", direct_dot["resolved"], alias_dot["resolved"])
+let absolute_dot = resolve_import("@/ui/../database/users", "tests/fixtures/sample/src/ui/Login.tsx", [], { "@": path_absolute("tests/fixtures/sample/src") })
+eq("absolute alias remains absolute", absolute_dot["resolved"], path_absolute("tests/fixtures/sample/src/database/users.ts"))
+
+// Human and Markdown presentation escapes controls without changing evidence.
+let control = parse_json("\"\\u001b[2J\\n\\u0085\"")
+eq("display escapes C0 and C1", display_text(control, false), "\\u001b[2J\\u000a\\u0085")
+eq("Markdown escapes syntax", display_text("<img>`[x]*_", true), "&lt;img&gt;&#96;&#91;x&#93;&#42;&#95;")
+mut hostile_result = fake_result
+mut hostile_rows = fake_result["violations"]
+mut hostile_row = hostile_rows[0]
+hostile_row["file"] = control + "<img>`file"
+hostile_rows[0] = hostile_row
+hostile_result["violations"] = hostile_rows
+let hostile_human = render_human(hostile_result, summary, "fence.toml")
+let hostile_markdown = render_markdown(hostile_result, summary, "fence.toml")
+ok("human report contains no injected controls", contains(hostile_human, control) == 0)
+ok("Markdown report contains no injected HTML", contains(hostile_markdown, "<img>") == 0)
+eq("machine report retains original filename", parse_json(render_json(hostile_result, summary, "fence.toml"))["violations"][0]["file"], hostile_row["file"])
+
+ok("go_module type rejected before resolution", count_errors(validate_config(normalize_config({ "go_module": [], "zones": { "all": { "paths": ["src/**"] } } }))) > 0)
 
 // ---- summary ----
 print("")

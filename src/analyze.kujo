@@ -20,6 +20,7 @@ from src.cache import cached_imports
 //     metrics: { resolution_cache_hits/misses, zone_cache_hits/misses }
 //   }
 export func analyze_files(files, cfg) {
+    if cfg["max_files"] > 0 && len(files) > cfg["max_files"] { throw("resource limit exceeded: max_files") }
     let zones = cfg["zones"]
     let zone_names = cfg["zone_names"]
     let roots = cfg["source_roots"]
@@ -143,6 +144,7 @@ export func analyze_files(files, cfg) {
 // the current Kujo process primitive waits synchronously; it establishes merge
 // semantics for future native concurrency without shell/background execution.
 export func analyze_sharded(files, cfg, shard_count) {
+    if cfg["max_files"] > 0 && len(files) > cfg["max_files"] { throw("resource limit exceeded: max_files") }
     if shard_count <= 1 || len(files) == 0 { return analyze_files(files, cfg) }
     mut shard_cfg = cfg
     mut combined = empty_result()
@@ -151,9 +153,16 @@ export func analyze_sharded(files, cfg, shard_count) {
     mut offset = 0
     while offset < total {
         let end = min(offset + width, total)
+        // Keep a positive remaining ceiling: zero means unlimited. If the
+        // budget is exhausted, allow one import only to detect overflow, then
+        // reject the combined result before publishing any partial analysis.
+        if cfg["max_imports"] > 0 {
+            shard_cfg["max_imports"] = max(1, cfg["max_imports"] - combined["imports_checked"])
+        }
         let part = analyze_files(slice(files, offset, end), shard_cfg)
         shard_cfg["import_cache"] = part["import_cache"]
         combined = merge_results(combined, part)
+        if cfg["max_imports"] > 0 && combined["imports_checked"] > cfg["max_imports"] { throw("resource limit exceeded: max_imports") }
         offset = end
     }
     return combined

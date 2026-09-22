@@ -202,3 +202,7 @@ missing file still returns 5. Explanation of a denied dependency still exits 0;
 Confined output requires the source runtime pinned in README. Use real directory
 paths for output parents; replace symlink aliases with their in-repository target
 paths. Reports, caches and baselines fail with IO exit 5 on rejected destinations.
+
+Human check/explain output displays repository-provided control characters as
+visible Unicode escapes. Markdown check reports escape embedded markup. Machine
+JSON/SARIF reports preserve original path/import values for exact processing.

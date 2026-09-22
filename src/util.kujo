@@ -84,3 +84,54 @@ export func count_in(arr, needle) {
 export func utf8_byte_length(text) {
     return len(decode_base64(encode_base64(to_string(text))))
 }
+
+// Escape untrusted text only at presentation boundaries; machine evidence stays
+// byte-for-byte intact. Ordinary text takes the fast path without a char walk.
+export func display_text(value, markdown) {
+    mut text = value
+    if regex_match(text, "[\\x00-\\x1f\\x7f-\\x9f]") {
+        let hex = "0123456789abcdef"
+        mut escaped = ""
+        mut i = 0
+        loop {
+            let ch = substring(text, i, i + 1)
+            if ch == "" { break }
+            if regex_match(ch, "[\\x00-\\x1f\\x7f-\\x9f]") {
+                let bytes = decode_base64(encode_base64(ch))
+                let code = bytes[len(bytes) - 1]
+                let high = floor(code / 16)
+                let low = code % 16
+                escaped = escaped + "\\u00" + substring(hex, high, high + 1) + substring(hex, low, low + 1)
+            } else { escaped = escaped + ch }
+            i = i + 1
+        }
+        text = escaped
+    }
+    if markdown {
+        text = replace(text, "&", "&amp;")
+        let chars = ["<", ">", "`", "*", "_", "[", "]", "|", "\\"]
+        let entities = ["&lt;", "&gt;", "&#96;", "&#42;", "&#95;", "&#91;", "&#93;", "&#124;", "&#92;"]
+        mut j = 0
+        while j < len(chars) { text = replace(text, chars[j], entities[j]); j = j + 1 }
+    }
+    return text
+}
+
+export func display_fields(fields, markdown) {
+    mut out = fields
+    let names = keys(fields)
+    mut i = 0
+    while i < len(names) {
+        let name = names[i]
+        if type_of(fields[name]) == "string" { out[name] = display_text(fields[name], markdown) }
+        i = i + 1
+    }
+    return out
+}
+
+export func display_rows(rows, markdown) {
+    mut out = []
+    mut i = 0
+    while i < len(rows) { out = push(out, display_fields(rows[i], markdown)); i = i + 1 }
+    return out
+}

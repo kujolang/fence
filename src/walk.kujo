@@ -62,8 +62,10 @@ func collect_files(source_roots, exclude_patterns) {
         mut ei = 0
         while ei < en {
             let name = entries[ei]
-            mut full = dir + "/" + name
-            full = replace(full, "\\", "/")
+            // A literal POSIX backslash is not a directory separator. Fence's
+            // portable glob/path model cannot represent it without ambiguity.
+            if contains(name, "\\") == 1 { throw("unsupported source filename containing backslash: " + to_json(name)) }
+            let full = dir + "/" + name
             if name == ".git" {
                 // skip
             } else {
