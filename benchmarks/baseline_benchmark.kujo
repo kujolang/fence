@@ -1,0 +1,20 @@
+// Isolate legacy-adoption matching; no filesystem or wall-clock gate.
+from src.baseline import baseline_from_result, apply_baseline, prune_baseline
+mut rows = []
+mut i = 0
+while i < 2000 {
+    rows = push(rows, { "from_zone": "ui", "to_zone": "db", "file": "src/ui/f" + to_string(i) + ".ts", "import": "../db/data" })
+    i = i + 1
+}
+let result = { "files_scanned": 2000, "imports_checked": 2000, "zone_files": { "ui": 2000 }, "violations": rows }
+let start_create = performance_now()
+let baseline = baseline_from_result(result)
+let create_ms = performance_now() - start_create
+let start_apply = performance_now()
+let applied = apply_baseline(result, baseline["fingerprints"])
+let apply_ms = performance_now() - start_apply
+let start_prune = performance_now()
+let pruned = prune_baseline(result, baseline["fingerprints"])
+let prune_ms = performance_now() - start_prune
+if len(baseline["fingerprints"]) != 2000 || applied["suppressed"] != 2000 || pruned["kept"] != 2000 { exit(1) }
+print(to_json_pretty({ "schema": "fence.baseline-benchmark/v1", "violations": 2000, "create_ms": create_ms, "apply_ms": apply_ms, "prune_ms": prune_ms, "baseline_sha256": sha256(to_json(baseline)), "applied_sha256": sha256(to_json(applied)), "pruned_sha256": sha256(to_json(pruned)) }))

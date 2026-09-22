@@ -4,7 +4,7 @@
 // fingerprints stored in `fence-baseline.json`. `check --baseline` suppresses
 // violations whose fingerprint is baselined; NEW violations still fail.
 
-from src.util import arr_has, sort_strings, dict_has, dict_get
+from src.util import sort_strings, dict_has, dict_get
 
 func baseline_path() {
     return "fence-baseline.json"
@@ -26,10 +26,12 @@ export func baseline_from_result(result) {
     let viols = result["violations"]
     let n = len(viols)
     mut fps = []
+    mut seen = {}
     mut i = 0
     while i < n {
         let fp = fingerprint(viols[i])
-        if arr_has(fps, fp) == false {
+        if has_key(seen, fp) == 0 {
+            seen[fp] = true
             fps = push(fps, fp)
         }
         i = i + 1
@@ -107,13 +109,14 @@ func valid_fingerprints(fps) {
 // plus the suppressed count.
 export func apply_baseline(result, fingerprints) {
     let viols = result["violations"]
+    let indexed = fingerprint_index(fingerprints)
     let n = len(viols)
     mut kept = []
     mut suppressed = 0
     mut i = 0
     while i < n {
         let v = viols[i]
-        if arr_has(fingerprints, fingerprint(v)) {
+        if has_key(indexed, fingerprint(v)) == 1 {
             suppressed = suppressed + 1
         } else {
             kept = push(kept, v)
@@ -138,13 +141,13 @@ export func apply_baseline(result, fingerprints) {
 // Keep only fingerprints still present in the current analysis. Returns a
 // deterministic baseline plus counts suitable for CLI review.
 export func prune_baseline(result, fingerprints) {
-    let current = baseline_from_result(result)["fingerprints"]
+    let current = fingerprint_index(baseline_from_result(result)["fingerprints"])
     let n = len(fingerprints)
     mut kept = []
     mut removed = []
     mut i = 0
     while i < n {
-        if arr_has(current, fingerprints[i]) {
+        if has_key(current, fingerprints[i]) == 1 {
             kept = push(kept, fingerprints[i])
         } else {
             removed = push(removed, fingerprints[i])
@@ -156,4 +159,15 @@ export func prune_baseline(result, fingerprints) {
         "kept": len(kept),
         "removed": sort_strings(removed)
     }
+}
+
+// One index per operation avoids repeated linear scans of large adoption sets.
+func fingerprint_index(fingerprints) {
+    mut out = {}
+    mut i = 0
+    while i < len(fingerprints) {
+        out[fingerprints[i]] = true
+        i = i + 1
+    }
+    return out
 }
