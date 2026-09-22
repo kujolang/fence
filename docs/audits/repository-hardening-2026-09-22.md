@@ -38,7 +38,8 @@ are expected reproduction evidence, not relaxed assertions. An extra unit run
 queued after the scale benchmark loaded the new tests; its receipt is named
 `regressions-before-repeat.txt`, not an original-suite baseline.
 
-Raw receipts are in [receipts/2026-09-22](receipts/2026-09-22/). A small resolver
+Receipts are in [receipts/2026-09-22](receipts/2026-09-22/); redundant trailing
+blank lines in the two graph receipts were trimmed for the whitespace gate. A small resolver
 probe independently reproduced an alias returning the misleading lexical path
 `tests/fixtures/sample/src/ui/../database/users.ts`.
 

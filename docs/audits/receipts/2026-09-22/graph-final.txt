@@ -16,5 +16,3 @@ core
 foundations
   can depend on: (none)
   cannot depend on: cli, commands, core
-
-
