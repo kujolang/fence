@@ -1,0 +1,110 @@
+{
+  "runtime": "kujo 1.4.0",
+  "order": "before/after/before/after; shared host",
+  "samples": [
+    {
+      "phase": "before",
+      "result": {
+        "analyze_ms": 11569.455809,
+        "engine": "kujo",
+        "files_scanned": 201,
+        "filter_ms": 2653.7859729999996,
+        "generation_ms": 2462.830081,
+        "imports_checked": 200,
+        "metrics": {
+          "import_cache_hits": 0,
+          "import_cache_misses": 0,
+          "resolution_cache_hits": 199,
+          "resolution_cache_misses": 1,
+          "zone_cache_hits": 200,
+          "zone_cache_misses": 201
+        },
+        "requested_files": 200,
+        "schema": "fence.benchmark/v1",
+        "shards": 1,
+        "total_scan_ms": 14263.357885999998,
+        "traversal_ms": 40.11610400000018,
+        "violations": 0,
+        "walk_ms": 2693.9020769999997
+      }
+    },
+    {
+      "phase": "after",
+      "result": {
+        "analyze_ms": 8176.086725999999,
+        "engine": "kujo",
+        "files_scanned": 201,
+        "filter_ms": 2836.8034139999995,
+        "generation_ms": 1362.700399,
+        "imports_checked": 200,
+        "metrics": {
+          "import_cache_hits": 0,
+          "import_cache_misses": 0,
+          "resolution_cache_hits": 199,
+          "resolution_cache_misses": 1,
+          "zone_cache_hits": 200,
+          "zone_cache_misses": 201
+        },
+        "requested_files": 200,
+        "schema": "fence.benchmark/v1",
+        "shards": 1,
+        "total_scan_ms": 11049.795187999998,
+        "traversal_ms": 36.90504799999985,
+        "violations": 0,
+        "walk_ms": 2873.7084619999996
+      }
+    },
+    {
+      "phase": "before",
+      "result": {
+        "analyze_ms": 7605.043796,
+        "engine": "kujo",
+        "files_scanned": 201,
+        "filter_ms": 2015.053021,
+        "generation_ms": 1900.026751,
+        "imports_checked": 200,
+        "metrics": {
+          "import_cache_hits": 0,
+          "import_cache_misses": 0,
+          "resolution_cache_hits": 199,
+          "resolution_cache_misses": 1,
+          "zone_cache_hits": 200,
+          "zone_cache_misses": 201
+        },
+        "requested_files": 200,
+        "schema": "fence.benchmark/v1",
+        "shards": 1,
+        "total_scan_ms": 9661.444405999999,
+        "traversal_ms": 41.34758899999997,
+        "violations": 0,
+        "walk_ms": 2056.4006099999997
+      }
+    },
+    {
+      "phase": "after",
+      "result": {
+        "analyze_ms": 7200.976222,
+        "engine": "kujo",
+        "files_scanned": 201,
+        "filter_ms": 2029.771742,
+        "generation_ms": 1150.2052749999998,
+        "imports_checked": 200,
+        "metrics": {
+          "import_cache_hits": 0,
+          "import_cache_misses": 0,
+          "resolution_cache_hits": 199,
+          "resolution_cache_misses": 1,
+          "zone_cache_hits": 200,
+          "zone_cache_misses": 201
+        },
+        "requested_files": 200,
+        "schema": "fence.benchmark/v1",
+        "shards": 1,
+        "total_scan_ms": 9260.372836999999,
+        "traversal_ms": 29.62487299999998,
+        "violations": 0,
+        "walk_ms": 2059.3966149999997
+      }
+    }
+  ]
+}

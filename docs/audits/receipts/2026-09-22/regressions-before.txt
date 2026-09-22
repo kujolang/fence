@@ -1,0 +1,10 @@
+FAIL: invalid exception rejected 0
+FAIL: invalid exception rejected 1
+FAIL: invalid exception rejected 2
+FAIL: invalid exception rejected 3
+FAIL: invalid exception rejected 4
+FAIL: analysis enforces file ceiling
+FAIL: shards enforce total file ceiling
+FAIL: shards enforce total import ceiling
+
+Fence tests: 272 passed, 8 failed

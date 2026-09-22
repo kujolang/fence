@@ -1,0 +1,46 @@
+{
+  "config": {
+    "path": "fence.toml"
+  },
+  "ignored_violations": [],
+  "schema_version": 1,
+  "skipped_files": [],
+  "status": "passed",
+  "summary": {
+    "errors": 0,
+    "files_scanned": 35,
+    "ignored_violations": 0,
+    "imports_checked": 107,
+    "skipped_files": 0,
+    "violations": 0,
+    "warnings": 0
+  },
+  "version": "1.0.0",
+  "violations": [],
+  "zones": [
+    {
+      "errors": 0,
+      "files": 1,
+      "name": "cli",
+      "warnings": 0
+    },
+    {
+      "errors": 0,
+      "files": 9,
+      "name": "commands",
+      "warnings": 0
+    },
+    {
+      "errors": 0,
+      "files": 20,
+      "name": "core",
+      "warnings": 0
+    },
+    {
+      "errors": 0,
+      "files": 5,
+      "name": "foundations",
+      "warnings": 0
+    }
+  ]
+}

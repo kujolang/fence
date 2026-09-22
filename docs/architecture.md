@@ -138,3 +138,9 @@ will hit crashes or `kujo check` failures:
   top-level helpers over deep nesting.
 
 See `agent/DECISIONS.md` (D4) for the verified details behind each item.
+
+Import candidates are lexically normalized before file lookup and zone matching;
+alias/direct imports cannot retain dot segments that disguise their target zone.
+Human check/explain and Markdown check renderers escape repository-provided data
+at presentation time. JSON/SARIF retain original evidence. Baseline operations
+build temporary fingerprint indexes without changing their persisted v1 format.

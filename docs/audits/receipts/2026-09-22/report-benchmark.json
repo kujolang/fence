@@ -1,0 +1,9 @@
+{
+  "eager_body_bytes": 337380,
+  "eager_ms": 49.939809000000004,
+  "quiet_body_bytes": 0,
+  "quiet_ms": 94.715489,
+  "schema": "fence.report-benchmark/v1",
+  "status": "failed",
+  "violations": 1000
+}
