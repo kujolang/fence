@@ -5,7 +5,7 @@
 // (which use plain i/n internally) cannot alias and corrupt the loop counters.
 
 from src.imports import detect_imports_with_adapters
-from src.resolve import resolve_import_with_go
+from src.resolve import resolve_import_with_inventory
 from src.zones import match_zone
 from src.decisions import decide_dependency
 from src.util import dict_get, dict_has, arr_has
@@ -83,7 +83,7 @@ export func analyze_files(files, cfg) {
                     res = resolution_cache[cache_key]
                     resolution_hits = resolution_hits + 1
                 } else {
-                    res = resolve_import_with_go(imp["path"], file, roots, aliases, cfg["go_module"])
+                    res = resolve_import_with_inventory(imp["path"], file, roots, aliases, cfg["go_module"], dict_get(cfg, "resolution_inventory", false))
                     resolution_cache[cache_key] = res
                     resolution_misses = resolution_misses + 1
                 }
@@ -138,6 +138,24 @@ export func analyze_files(files, cfg) {
             "import_cache_misses": import_cache_misses
         }
     }
+}
+
+// Read-only snapshot integrations must supply private source copies and an
+// authoritative file inventory. This confines resolution lookups; it is not an
+// OS sandbox or a replacement for the caller's bounded, beneath-root reads.
+export func analyze_snapshot(files, cfg, inventory) {
+    if type_of(inventory) != "dict" { throw("snapshot inventory must be a dictionary") }
+    if len(keys(cfg["parser_adapters"])) > 0 { throw("snapshot analysis does not execute parser adapters") }
+    if cfg["use_cache"] { throw("snapshot analysis does not use persistent extraction caches") }
+    let file_count = len(files)
+    mut file_index = 0
+    while file_index < file_count {
+        if dict_has(inventory, files[file_index]) == false { throw("snapshot source is missing from inventory") }
+        file_index = file_index + 1
+    }
+    mut snapshot_cfg = cfg
+    snapshot_cfg["resolution_inventory"] = inventory
+    return analyze_files(files, snapshot_cfg)
 }
 
 // Deterministic contiguous sharding. This is intentionally sequential because

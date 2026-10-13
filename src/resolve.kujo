@@ -87,6 +87,12 @@ func join_segs(segs) {
 // Try a base path against known extensions and directory-index files.
 // Returns the resolved repo path, or "" if nothing exists.
 export func try_candidates(raw_base) {
+    return try_candidates_in(raw_base, false)
+}
+
+// A dictionary inventory is authoritative: never consult ambient filesystem
+// state for missing entries. false preserves the ordinary CLI resolver.
+func try_candidates_in(raw_base, inventory) {
     // Filesystem lookup and zone matching must share the same lexical identity.
     // Alias and direct imports may contain dot segments, just like relatives.
     mut base = raw_base
@@ -96,8 +102,9 @@ export func try_candidates(raw_base) {
     if base == "" {
         return ""
     }
-    if file_exists(base) {
-        if path_is_dir(base) == false {
+    let inventory_mode = type_of(inventory) == "dict"
+    if (inventory_mode && dict_has(inventory, base)) || (inventory_mode == false && file_exists(base)) {
+        if inventory_mode || path_is_dir(base) == false {
             return base
         }
     }
@@ -106,7 +113,7 @@ export func try_candidates(raw_base) {
     mut i = 0
     while i < en {
         let cand_f = base + exts[i]
-        if file_exists(cand_f) {
+        if (inventory_mode && dict_has(inventory, cand_f)) || (inventory_mode == false && file_exists(cand_f)) {
             return cand_f
         }
         i = i + 1
@@ -115,15 +122,15 @@ export func try_candidates(raw_base) {
     mut j = 0
     while j < en {
         let cand_idx = base + "/index" + exts[j]
-        if file_exists(cand_idx) {
+        if (inventory_mode && dict_has(inventory, cand_idx)) || (inventory_mode == false && file_exists(cand_idx)) {
             return cand_idx
         }
         j = j + 1
     }
-    if file_exists(base + "/mod.rs") {
+    if (inventory_mode && dict_has(inventory, base + "/mod.rs")) || (inventory_mode == false && file_exists(base + "/mod.rs")) {
         return base + "/mod.rs"
     }
-    if file_exists(base + "/__init__.py") {
+    if (inventory_mode && dict_has(inventory, base + "/__init__.py")) || (inventory_mode == false && file_exists(base + "/__init__.py")) {
         return base + "/__init__.py"
     }
     return ""
@@ -249,10 +256,19 @@ export func resolve_import(raw, current_file, source_roots, aliases) {
 }
 
 export func resolve_import_with_go(raw, current_file, source_roots, aliases, go_module) {
+    return resolve_import_with_inventory(raw, current_file, source_roots, aliases, go_module, false)
+}
+
+// Snapshot integrations pass a dictionary of available file paths. Existing
+// resolution precedence is unchanged, but lookup never escapes that inventory.
+export func resolve_import_with_inventory(raw, current_file, source_roots, aliases, go_module, inventory) {
+    if type_of(inventory) != "dict" {
+        if type_of(inventory) != type_of(false) || inventory != false { throw("resolution inventory must be a dictionary or false") }
+    }
     // 1. JS/TS relative.
     if is_rel_slash(raw) {
         let base_rel = join_path(parent_dir(current_file), raw)
-        let r_rel = try_candidates(base_rel)
+        let r_rel = try_candidates_in(base_rel, inventory)
         if r_rel != "" {
             return mk("internal", r_rel, raw)
         }
@@ -263,7 +279,7 @@ export func resolve_import_with_go(raw, current_file, source_roots, aliases, go_
     if starts_with(raw, ".") {
         if contains(raw, "/") == 0 {
             let base_py = python_rel_base(raw, current_file)
-            let r_py = try_candidates(base_py)
+            let r_py = try_candidates_in(base_py, inventory)
             if r_py != "" {
                 return mk("internal", r_py, raw)
             }
@@ -275,7 +291,7 @@ export func resolve_import_with_go(raw, current_file, source_roots, aliases, go_
     if file_ext(current_file) == ".rs" {
         let rust_base = rust_relative_base(raw, current_file)
         if rust_base != "" {
-            let r_rust = try_candidates(rust_base)
+            let r_rust = try_candidates_in(rust_base, inventory)
             if r_rust != "" {
                 return mk("internal", r_rust, raw)
             }
@@ -286,7 +302,7 @@ export func resolve_import_with_go(raw, current_file, source_roots, aliases, go_
     if file_ext(current_file) == ".go" && go_module != "" {
         if starts_with(raw, go_module + "/") {
             let go_path = substring(raw, len(go_module) + 1, len(raw))
-            let r_go = try_under_roots(go_path, source_roots)
+            let r_go = try_under_roots(go_path, source_roots, inventory)
             if r_go != "" { return mk("internal", r_go, raw) }
             return mk("unknown", "", raw)
         }
@@ -295,7 +311,7 @@ export func resolve_import_with_go(raw, current_file, source_roots, aliases, go_
     // 5. Alias prefix.
     let aliased = apply_alias(raw, aliases)
     if aliased != "" {
-        let r_alias = try_candidates(aliased)
+        let r_alias = try_candidates_in(aliased, inventory)
         if r_alias != "" {
             return mk("internal", r_alias, raw)
         }
@@ -304,11 +320,11 @@ export func resolve_import_with_go(raw, current_file, source_roots, aliases, go_
 
     // 6. Root-relative / dotted module path.
     let modpath = module_to_path(raw)
-    let direct = try_candidates(modpath)
+    let direct = try_candidates_in(modpath, inventory)
     if direct != "" {
         return mk("internal", direct, raw)
     }
-    let under = try_under_roots(modpath, source_roots)
+    let under = try_under_roots(modpath, source_roots, inventory)
     if under != "" {
         return mk("internal", under, raw)
     }
@@ -317,12 +333,12 @@ export func resolve_import_with_go(raw, current_file, source_roots, aliases, go_
     return mk("external", "", raw)
 }
 
-func try_under_roots(modpath, source_roots) {
+func try_under_roots(modpath, source_roots, inventory) {
     let n = len(source_roots)
     mut i = 0
     while i < n {
         let cand = source_roots[i] + "/" + modpath
-        let r = try_candidates(cand)
+        let r = try_candidates_in(cand, inventory)
         if r != "" {
             return r
         }

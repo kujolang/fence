@@ -16,7 +16,7 @@ from src.util import arr_has, sort_strings, join_strings, truthy, utf8_byte_leng
 from src.config import normalize_config, load_composed
 from src.validate import validate_config, count_errors
 from src.imports import extract_for_ext, detect_imports_result
-from src.resolve import resolve_import, resolve_import_with_go
+from src.resolve import resolve_import, resolve_import_with_go, resolve_import_with_inventory
 from src.zones import match_zone
 from src.rules import check_dependency, suggest
 from src.reports import summarize, render_json, render_sarif
@@ -25,7 +25,7 @@ from src.cliargs import parse_args, flag_or, has_flag
 from src.git import valid_ref
 from src.cycles import one_cycle, cycle_nodes
 from src.templates import template_by_name
-from src.analyze import analyze_files, analyze_sharded
+from src.analyze import analyze_files, analyze_sharded, analyze_snapshot
 from src.baseline import fingerprint, baseline_from_result, apply_baseline, prune_baseline
 from src.rules import check_external
 from src.reports import render_human, render_markdown
@@ -602,6 +602,47 @@ ok("Markdown report contains no injected HTML", contains(hostile_markdown, "<img
 eq("machine report retains original filename", parse_json(render_json(hostile_result, summary, "fence.toml"))["violations"][0]["file"], hostile_row["file"])
 
 ok("go_module type rejected before resolution", count_errors(validate_config(normalize_config({ "go_module": [], "zones": { "all": { "paths": ["src/**"] } } }))) > 0)
+
+// Inventory resolution must not fall back to files outside the supplied snapshot.
+let inventory = { "virtual/ui/view.ts": true, "virtual/core/service.ts": true, "virtual/pkg/index.ts": true, "virtual/rust/child.rs": true, "virtual/python/models.py": true, "virtual/domain/index.go": true }
+eq("inventory relative normalization", resolve_import_with_inventory("../ui/../core/service", "virtual/ui/view.ts", [], {}, "", inventory)["resolved"], "virtual/core/service.ts")
+eq("inventory alias normalization", resolve_import_with_inventory("@/ui/../core/service", "virtual/ui/view.ts", [], { "@": "virtual" }, "", inventory)["resolved"], "virtual/core/service.ts")
+eq("inventory directory index", resolve_import_with_inventory("virtual/pkg", "virtual/ui/view.ts", [], {}, "", inventory)["resolved"], "virtual/pkg/index.ts")
+eq("inventory Rust sibling", resolve_import_with_inventory("child", "virtual/rust/mod.rs", [], {}, "", inventory)["resolved"], "virtual/rust/child.rs")
+eq("inventory Python relative", resolve_import_with_inventory(".models", "virtual/python/main.py", [], {}, "", inventory)["resolved"], "virtual/python/models.py")
+eq("inventory Go module", resolve_import_with_inventory("example.com/app/domain", "virtual/main.go", ["virtual"], {}, "example.com/app", inventory)["resolved"], "virtual/domain/index.go")
+eq("empty inventory cannot see real relative source", resolve_import_with_inventory("../database/users", "tests/fixtures/sample/src/ui/Login.tsx", [], {}, "", {})["status"], "unknown")
+eq("inventory cannot see real absolute alias", resolve_import_with_inventory("@/database/users", "virtual/ui/view.ts", [], { "@": path_absolute("tests/fixtures/sample/src") }, "", inventory)["status"], "unknown")
+eq("inventory cannot traverse into ambient source", resolve_import_with_inventory("../../tests/fixtures/sample/src/database/users", "virtual/ui/view.ts", [], {}, "", inventory)["status"], "unknown")
+mut malformed_inventory_rejected = false
+try { resolve_import_with_inventory("./x", "main.ts", [], {}, "", []) } except e { malformed_inventory_rejected = true }
+ok("malformed inventory fails closed", malformed_inventory_rejected)
+
+let snapshot_source = "tests/fixtures/sample/src/ui/Login.tsx"
+let snapshot_files = { "tests/fixtures/sample/src/ui/Login.tsx": true, "tests/fixtures/sample/src/database/users.ts": true }
+let snapshot_config = normalize_config({ "source_roots": ["tests/fixtures/sample/src"], "zones": { "ui": { "paths": ["tests/fixtures/sample/src/ui/**"], "cannot_depend_on": ["database"] }, "database": { "paths": ["tests/fixtures/sample/src/database/**"] } } })
+let snapshot_result = analyze_snapshot([snapshot_source], snapshot_config, snapshot_files)
+eq("snapshot analysis retains boundary violation", summarize(snapshot_result, snapshot_config)["status"], "failed")
+ok("snapshot API leaves caller configuration unchanged", has_key(snapshot_config, "resolution_inventory") == 0)
+let adapter_marker = "tests/tmp/snapshot-adapter.out"
+let adapter_command = ["kujo", "run", "tests/fixtures/snapshot_adapter.kujo", "--", adapter_marker]
+let adapter_control = run_adapter(snapshot_source, adapter_command)
+ok("snapshot adapter control actually runs", adapter_control["ok"] && file_exists(adapter_marker))
+delete_file(adapter_marker)
+mut snapshot_adapter_rejected = false
+mut adapter_snapshot_config = snapshot_config
+adapter_snapshot_config["parser_adapters"] = { ".tsx": adapter_command }
+try { analyze_snapshot([snapshot_source], adapter_snapshot_config, snapshot_files) } except e { snapshot_adapter_rejected = contains(to_string(e), "snapshot analysis does not execute parser adapters") == 1 }
+ok("snapshot refuses executable adapters", snapshot_adapter_rejected)
+ok("snapshot refused adapter has no effects", file_exists(adapter_marker) == false)
+mut snapshot_cache_rejected = false
+mut cache_snapshot_config = snapshot_config
+cache_snapshot_config["use_cache"] = true
+try { analyze_snapshot([snapshot_source], cache_snapshot_config, snapshot_files) } except e { snapshot_cache_rejected = true }
+ok("snapshot refuses ambient extraction caches", snapshot_cache_rejected)
+mut snapshot_missing_rejected = false
+try { analyze_snapshot([snapshot_source], snapshot_config, {}) } except e { snapshot_missing_rejected = true }
+ok("snapshot refuses unlisted source reads", snapshot_missing_rejected)
 
 // ---- summary ----
 print("")
