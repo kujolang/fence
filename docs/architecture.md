@@ -138,3 +138,44 @@ will hit crashes or `kujo check` failures:
   top-level helpers over deep nesting.
 
 See `agent/DECISIONS.md` (D4) for the verified details behind each item.
+
+Import candidates are lexically normalized before file lookup and zone matching;
+alias/direct imports cannot retain dot segments that disguise their target zone.
+Human check/explain and Markdown check renderers escape repository-provided data
+at presentation time. JSON/SARIF retain original evidence. Baseline operations
+build temporary fingerprint indexes without changing their persisted v1 format.
+
+## Embedding a private snapshot
+
+`src.analyze.analyze_snapshot(files, cfg, inventory)` supports hosts that copy a
+bounded source snapshot into a private working directory. `cfg` is a normalized,
+validated Fence config. `inventory` is a dictionary whose keys are the available
+regular-file paths, including targets that are not selected for analysis; values
+are ignored. Every analyzed source must be present in that inventory.
+
+`src.walk.select_inventory_files(inventory, source_roots, include, exclude)`
+selects source paths without a filesystem walk, using the normal glob matcher.
+It rejects escaping roots and non-normalized inventory paths. Root `.` selects
+from the whole inventory; returned paths are sorted.
+
+The API rejects configured parser adapters and persistent extraction caching.
+It uses the same extraction, resolution precedence, zone rules, exception policy,
+limits and result shape as ordinary analysis. Resolution only consults the
+supplied inventory, including for extension and directory-index candidates; an
+empty dictionary never falls back to ambient files. The caller's configuration
+is not modified. `src.resolve.resolve_import_with_inventory` exposes the same
+lookup mode for focused consumers; pass a dictionary, not `false` (the legacy
+filesystem mode used by ordinary resolver entry points). Other argument types
+are rejected.
+
+This is a library integration boundary, not an OS sandbox. The host must perform
+bounded, beneath-root reads, reject unsafe config/source paths and symlinks,
+create private source copies, and bound execution/output. Analysis still reads
+the listed source files from its working directory. Include the complete copied
+file inventory so an excluded analysis target can still resolve correctly;
+report omitted source coverage separately. Do not silently remove configured
+parser adapters or weaken architecture rules to obtain a result.
+
+The CLI continues to use filesystem-backed resolution, including existing
+absolute-alias behavior. Snapshot integration does not change CLI flags, config
+schema or JSON/SARIF result contracts.

@@ -4,7 +4,8 @@
 
 Fence is local-first and minimizes its trust surface by design:
 
-- **No network access.** Fence never makes network calls.
+- **Offline core.** Fence itself never makes network calls. Configured parser
+  adapters are trusted executables, not network-sandboxed by Fence.
 - **Explicit adapter trust boundary.** Config is parsed as data and never
   evaluated. Optional `[parser_adapters]` entries do launch configured argv
   directly, without a shell; treat repositories enabling adapters as trusted
@@ -13,13 +14,22 @@ Fence is local-first and minimizes its trust surface by design:
   argv calls for Git and explicitly configured parser adapters. Ref names (`--base`) are
   length-capped, character-restricted, option-safe, and rejected when they use
   ambiguous range/reflog or invalid ref syntax.
-- **Path-safe writes.** File output (`init`, `--output`, `baseline create`) is
-  restricted to the working directory: absolute paths, `~`, `..`, and
-  drive-letter paths are rejected, and a symlinked parent that would escape the
-  tree is rejected via canonical-ancestor resolution. Atomic publication preserves
-  existing output on write failure. Confinement checks and publication are separate
-  operations: a hostile concurrent process can race ancestor replacement. Use
-  OS isolation for repositories writable by an adversary during a scan.
+- **Path-safe writes.** File output (`init`, `--output`, baselines and cache)
+  uses Kujo's `write_file_atomic_beneath` with held directory handles. Absolute
+  paths, `~`, `..`, drive/stream paths and `.git` components are rejected.
+  Symlink parents (even within the repository) and stable final symlinks are
+  rejected. Atomic publication prevents torn output and no-replace publication
+  cannot overwrite a competing winner. Confinement is to directory identity,
+  not continuous ancestry: an already-open directory can be moved. See the
+  [native contract](docs/audits/confined-output-implementation.md).
+- **Consistent import identity.** Candidate paths are lexically normalized before
+  filesystem lookup and zone matching, including alias and direct imports.
+  Literal backslashes in source directory entries fail a full scan instead of
+  being silently interpreted as separators. Source symlinks and configured roots
+  remain trusted repository layout; Fence is not a filesystem read sandbox.
+- **Presentation safety.** Human check/explain fields escape C0/C1 controls;
+  Markdown check fields additionally escape markup. JSON/SARIF retain original
+  evidence. Treat report contents as untrusted data, never agent instructions.
 - **No secret exposure.** Fence does not print file contents (only import lines
   and paths) and does not read or log environment secrets.
 - **Optional output confinement.** Enterprises can restrict `--output` to

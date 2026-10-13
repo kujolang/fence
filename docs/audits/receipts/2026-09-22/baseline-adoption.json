@@ -1,0 +1,10 @@
+{
+  "applied_sha256": "efe3c624f2f263054c2865b154df1769eeab34b6a8b7bf4486b8d13132b4d226",
+  "apply_ms": 7145.578318,
+  "baseline_sha256": "55d6ba3caead233e800b451bf3f21f7bb1972e1be525912948565b494cf8ac1d",
+  "create_ms": 10556.178465,
+  "prune_ms": 22329.863581999994,
+  "pruned_sha256": "d326cd437cc1b24c9421076e829ce5457833b78ec2913ba172c4afc9f6aeab32",
+  "schema": "fence.baseline-benchmark/v1",
+  "violations": 2000
+}

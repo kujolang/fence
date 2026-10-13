@@ -205,6 +205,13 @@ docs/                   documentation
 agent/                  ignored archive of implementation prompts and handoffs
 ```
 
+## Embedding in a host
+
+Hosts with private source snapshots can use the native `analyze_snapshot` library
+API to restrict import resolution to a supplied file inventory and reject
+executable parser adapters. The host remains responsible for bounded source
+reads and process limits. See [Snapshot integration](docs/architecture.md#embedding-a-private-snapshot).
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the module map, the Kujo VM quirks to
@@ -215,10 +222,8 @@ Licensed under [MIT](LICENSE).
 
 ### Runtime requirement for confined output
 
-This source version requires Kujo commit
-`97aa13a338b154646d96e5c257e5d17fed17bef9` or a descendant containing
-`write_file_atomic_beneath`. Released Kujo 1.3.1 and earlier lack this API.
-CI pins that source commit; no newer release tag is claimed. Build that revision
-with `cargo build --release --locked` and put its `target/release` on PATH.
+Use Kujo **1.4.0 or later**, which includes `write_file_atomic_beneath`.
+The source minimum is commit `97aa13a338b154646d96e5c257e5d17fed17bef9`;
+CI continues to pin that revision to test the minimum supported API.
 Output writes fail closed on older runtimes; there is no path-based fallback.
 Symlinked output parents (including links within the repository) are rejected.

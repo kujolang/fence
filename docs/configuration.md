@@ -192,3 +192,20 @@ zones, allow/deny conflicts, zones with no paths, **overlapping zone paths**,
 
 Malformed container types (including zones, scan lists, and aliases) are rejected
 while loading config, with a config error instead of a later runtime exception.
+
+### Exception validation and scan ceilings
+
+Ignore reasons must be non-empty strings; optional `file`, `import`,
+`from_zone`, and `to_zone` selectors must be strings. Expiry must be a real
+calendar date in `YYYY-MM-DD` form (including leap-year validation).
+Invalid exception configuration returns exit 2 before matching or date auditing.
+
+`max_files` also applies to baseline create/prune and observed graphs. Analysis
+shards share the total file/import ceilings; splitting a scan cannot reset the
+budget. These ceilings do not bound allocations during directory traversal,
+source extraction or report rendering.
+
+Portable source paths cannot represent literal POSIX backslashes: a full walk
+fails with exit 4 and identifies the unsupported entry. Rename the entry or
+exclude its enclosing subtree. Import dot segments are normalized before zone
+classification, so aliases cannot disguise a denied cross-zone dependency.

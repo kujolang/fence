@@ -4,7 +4,7 @@
 // All string building uses single-string accumulation (out = out + ...) rather
 // than push+join, which can crash the VM on large outputs.
 
-from src.util import dict_get, dict_has, sort_strings
+from src.util import dict_get, dict_has, sort_strings, display_rows
 from src.meta import fence_version
 
 // ---- severity ranking ----
@@ -111,7 +111,12 @@ func count_zone(viols, zone, severity) {
 }
 
 // ---- human renderer ----
-export func render_human(result, summary, config_path) {
+export func render_human(raw_result, raw_summary, config_path) {
+    mut result = raw_result
+    result["violations"] = display_rows(raw_result["violations"], false)
+    result["skipped_files"] = display_rows(dict_get(raw_result, "skipped_files", []), false)
+    mut summary = raw_summary
+    summary["zones"] = display_rows(raw_summary["zones"], false)
     let viols = result["violations"]
     mut o = ""
     o = o + "Fence Report\n"
@@ -313,7 +318,12 @@ func sarif_level(severity) {
 }
 
 // ---- Markdown renderer ----
-export func render_markdown(result, summary, config_path) {
+export func render_markdown(raw_result, raw_summary, config_path) {
+    mut result = raw_result
+    result["violations"] = display_rows(raw_result["violations"], true)
+    result["skipped_files"] = display_rows(dict_get(raw_result, "skipped_files", []), true)
+    mut summary = raw_summary
+    summary["zones"] = display_rows(raw_summary["zones"], true)
     let viols = result["violations"]
     mut o = ""
     o = o + "# Fence Architecture Report\n\n"

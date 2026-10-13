@@ -1,7 +1,7 @@
 # Linux and Windows verification
 
 `.github/workflows/platform-verification.yml` runs the same Kujo-native release
-gate on `ubuntu-latest` and `windows-latest` using pinned Kujo v1.0.1 source and
+gate on `ubuntu-latest` and `windows-latest` using pinned Kujo source revision `97aa13a338b154646d96e5c257e5d17fed17bef9` and
 pinned action revisions. `scripts/verify_release.kujo` checks every Kujo module,
 the unit/contract suite, CLI exit codes, self-dogfood, all passing and failing
 examples, and deterministic release-artifact generation.

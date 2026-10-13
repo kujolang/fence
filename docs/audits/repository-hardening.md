@@ -1,3 +1,5 @@
+> Latest pass: [2026-09-22 audit and verification](repository-hardening-2026-09-22.md). This report preserves the earlier baseline.
+
 # Fence repository hardening audit
 
 > Current status (2026-09-07): F12 is implemented in Kujo and integrated into Fence.

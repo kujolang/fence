@@ -1,0 +1,4 @@
+let argv = args()
+if len(argv) != 2 { exit(2) }
+write_file(argv[0], "adapter executed", true)
+print(to_json({ "schema": "fence.parser-adapter/v1", "imports": [] }))

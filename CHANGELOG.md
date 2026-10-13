@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased — snapshot integration, 2026-10-13
+
+- Preserve Windows drive, UNC and extended-path prefixes when normalizing import candidates.
+- Add inventory-backed native import resolution and `analyze_snapshot` for hosts
+  using private source copies. Missing inventory entries never fall back to the
+  filesystem; executable parser adapters and persistent caches are rejected.
+  Existing CLI resolution and report contracts remain unchanged.
+
+## Unreleased — repository hardening, 2026-09-22
+
+- Normalize all resolved import candidates before zone matching to close alias
+  and direct-path dot-segment boundary bypasses.
+- Fail full scans on ambiguous literal-backslash directory entries.
+- Escape untrusted controls in human check/explain output and markup in Markdown
+  reports while preserving JSON/SARIF evidence.
+- Validate exception field types and real calendar expiry dates.
+- Enforce file ceilings across baseline/observed-graph analysis and total import
+  ceilings across sequential shards.
+- Index baseline fingerprints without changing persisted schema or suppression.
+- Correct package minimum runtime to Kujo 1.4.0 and update confinement guidance.
+
 All notable changes to Fence are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to
 follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).

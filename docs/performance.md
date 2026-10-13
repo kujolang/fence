@@ -119,3 +119,13 @@ wall-clock threshold. Retain full reports when `--output` or a byte ceiling
 requires them. Cache retention is now explicitly bounded; see
 [commands](commands.md#cache-lifecycle-and-suppressed-reports) for its lifecycle
 and trust contract.
+
+## Baseline adoption matching (2026-09-22)
+
+Baseline create/apply/prune now use per-operation fingerprint indexes. On the
+same 2,000-violation fixture, application measured 7,145.58 ms before and 120.21 ms
+after, with identical result hashes. These are individual samples on a shared
+host, not end-to-end scan latency guarantees. Run
+`kujo run benchmarks/baseline_benchmark.kujo` to reproduce. See the
+[dated audit](audits/repository-hardening-2026-09-22.md) for all measurements,
+resource tradeoffs and regression coverage.

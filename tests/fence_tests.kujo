@@ -12,11 +12,11 @@
 
 from src.glob import glob_match, glob_match_any
 from src.paths import is_safe_output, file_ext, parent_dir, base_name
-from src.util import arr_has, sort_strings, join_strings, truthy, utf8_byte_length
+from src.util import arr_has, sort_strings, join_strings, truthy, utf8_byte_length, display_text
 from src.config import normalize_config, load_composed
 from src.validate import validate_config, count_errors
 from src.imports import extract_for_ext, detect_imports_result
-from src.resolve import resolve_import, resolve_import_with_go
+from src.resolve import resolve_import, resolve_import_with_go, resolve_import_with_inventory
 from src.zones import match_zone
 from src.rules import check_dependency, suggest
 from src.reports import summarize, render_json, render_sarif
@@ -25,12 +25,12 @@ from src.cliargs import parse_args, flag_or, has_flag
 from src.git import valid_ref
 from src.cycles import one_cycle, cycle_nodes
 from src.templates import template_by_name
-from src.analyze import analyze_files, analyze_sharded
+from src.analyze import analyze_files, analyze_sharded, analyze_snapshot
 from src.baseline import fingerprint, baseline_from_result, apply_baseline, prune_baseline
 from src.rules import check_external
 from src.reports import render_human, render_markdown
 from src.graph import render_graph_json, render_graph_dot, render_graph_human
-from src.walk import walk
+from src.walk import walk, select_inventory_files
 from src.meta import no_config_text
 from src.output import output_root_allowed
 from src.walk import include_extensions, walk_profile
@@ -530,6 +530,136 @@ eq("summary omits unused body", render_for_flags(fake_result, summary, "fence.to
 eq("quiet validates format", render_for_flags(fake_result, summary, "fence.toml", "invalid", { "quiet": "true" }, 0)["ok"], false)
 eq("quiet output preserves report", render_for_flags(fake_result, summary, "fence.toml", "json", { "quiet": "true", "output": "out.json" }, 0)["text"], render_json(fake_result, summary, "fence.toml"))
 eq("quiet ceiling measures report", render_for_flags(fake_result, summary, "fence.toml", "json", { "quiet": "true" }, 1)["text"], render_json(fake_result, summary, "fence.toml"))
+
+// Audit regressions: invalid exceptions must never reach matching/date parsing.
+let invalid_exceptions = [
+    { "reason": "migration", "expires": "2999-99-99" },
+    { "reason": "migration", "expires": "2100-02-29" },
+    { "reason": 42, "expires": "2999-01-01" },
+    { "reason": "migration", "expires": "2999-01-01", "file": 42 },
+    { "reason": "migration", "expires": "2999-01-01", "from_zone": [] }
+]
+mut audit_i = 0
+while audit_i < len(invalid_exceptions) {
+    let invalid_ignore_cfg = normalize_config({ "zones": { "all": { "paths": ["src/**"] } }, "ignores": [invalid_exceptions[audit_i]] })
+    ok("invalid exception rejected " + to_string(audit_i), count_errors(validate_config(invalid_ignore_cfg)) > 0)
+    audit_i = audit_i + 1
+}
+let leap_ignore_cfg = normalize_config({ "zones": { "all": { "paths": ["src/**"] } }, "ignores": [{ "reason": "migration", "expires": "2400-02-29" }] })
+eq("real leap date accepted", count_errors(validate_config(leap_ignore_cfg)), 0)
+
+// Limits apply to analysis callers and the total across sequential shards.
+write_file("tests/tmp/budget-a.ts", "import a from \"one\"", true)
+write_file("tests/tmp/budget-b.ts", "import b from \"two\"", true)
+let budget_files = ["tests/tmp/budget-a.ts", "tests/tmp/budget-b.ts"]
+mut budget_cfg = normalize_config({ "zones": { "all": { "paths": ["tests/tmp/**"] } }, "limits": { "max_files": 1 } })
+mut files_rejected = false
+try { analyze_files(budget_files, budget_cfg) } except e { files_rejected = true }
+ok("analysis enforces file ceiling", files_rejected)
+mut shard_files_rejected = false
+try { analyze_sharded(budget_files, budget_cfg, 2) } except e { shard_files_rejected = true }
+ok("shards enforce total file ceiling", shard_files_rejected)
+budget_cfg["max_files"] = 0
+budget_cfg["max_imports"] = 1
+mut imports_rejected = false
+try { analyze_sharded(budget_files, budget_cfg, 2) } except e { imports_rejected = true }
+ok("shards enforce total import ceiling", imports_rejected)
+budget_cfg["max_imports"] = 2
+eq("exact shard budget accepted", analyze_sharded(budget_files, budget_cfg, 2)["imports_checked"], 2)
+delete_file("tests/tmp/budget-a.ts")
+delete_file("tests/tmp/budget-b.ts")
+
+// Baseline indexing preserves duplicate suppression and prune semantics.
+let repeated_result = { "files_scanned": 1, "imports_checked": 2, "zone_files": {}, "violations": [fake_result["violations"][0], fake_result["violations"][0]] }
+let repeated_fp = fingerprint(fake_result["violations"][0])
+eq("baseline creation deduplicates", baseline_from_result(repeated_result)["fingerprints"], [repeated_fp])
+eq("baseline suppresses each occurrence", apply_baseline(repeated_result, [repeated_fp, repeated_fp])["suppressed"], 2)
+eq("prune preserves duplicate existing entries", prune_baseline(repeated_result, [repeated_fp, "stale", repeated_fp])["baseline"]["fingerprints"], [repeated_fp, repeated_fp])
+eq("prune reports stale entries", prune_baseline(repeated_result, [repeated_fp, "stale"])["removed"], ["stale"])
+
+// Candidate identity must match the file actually opened by the filesystem.
+let alias_dot = resolve_import("@/ui/../database/users", "tests/fixtures/sample/src/ui/Login.tsx", ["tests/fixtures/sample/src"], { "@": "tests/fixtures/sample/src" })
+eq("alias dot segments normalized", alias_dot["resolved"], "tests/fixtures/sample/src/database/users.ts")
+let direct_dot = resolve_import("tests/fixtures/sample/src/ui/../database/users", "tests/fixtures/sample/src/ui/Login.tsx", ["tests/fixtures/sample/src"], {})
+eq("direct dot segments normalized", direct_dot["resolved"], alias_dot["resolved"])
+let absolute_dot = resolve_import("@/ui/../database/users", "tests/fixtures/sample/src/ui/Login.tsx", [], { "@": path_absolute("tests/fixtures/sample/src") })
+eq("absolute alias remains absolute", absolute_dot["resolved"], path_absolute("tests/fixtures/sample/src/database/users.ts"))
+
+// Human and Markdown presentation escapes controls without changing evidence.
+let control = parse_json("\"\\u001b[2J\\n\\u0085\"")
+eq("display escapes C0 and C1", display_text(control, false), "\\u001b[2J\\u000a\\u0085")
+eq("Markdown escapes syntax", display_text("<img>`[x]*_", true), "&lt;img&gt;&#96;&#91;x&#93;&#42;&#95;")
+mut hostile_result = fake_result
+mut hostile_rows = fake_result["violations"]
+mut hostile_row = hostile_rows[0]
+hostile_row["file"] = control + "<img>`file"
+hostile_rows[0] = hostile_row
+hostile_result["violations"] = hostile_rows
+let hostile_human = render_human(hostile_result, summary, "fence.toml")
+let hostile_markdown = render_markdown(hostile_result, summary, "fence.toml")
+ok("human report contains no injected controls", contains(hostile_human, control) == 0)
+ok("Markdown report contains no injected HTML", contains(hostile_markdown, "<img>") == 0)
+eq("machine report retains original filename", parse_json(render_json(hostile_result, summary, "fence.toml"))["violations"][0]["file"], hostile_row["file"])
+
+ok("go_module type rejected before resolution", count_errors(validate_config(normalize_config({ "go_module": [], "zones": { "all": { "paths": ["src/**"] } } }))) > 0)
+
+// Inventory resolution must not fall back to files outside the supplied snapshot.
+let inventory = { "virtual/ui/view.ts": true, "virtual/core/service.ts": true, "virtual/pkg/index.ts": true, "virtual/rust/child.rs": true, "virtual/python/models.py": true, "virtual/domain/index.go": true }
+eq("inventory relative normalization", resolve_import_with_inventory("../ui/../core/service", "virtual/ui/view.ts", [], {}, "", inventory)["resolved"], "virtual/core/service.ts")
+eq("inventory alias normalization", resolve_import_with_inventory("@/ui/../core/service", "virtual/ui/view.ts", [], { "@": "virtual" }, "", inventory)["resolved"], "virtual/core/service.ts")
+// Pure inventories exercise platform path identities without ambient lookups.
+let platform_inventory = { "C:/core/service.ts": true, "C:/virtual/core/service.ts": true, "//server/share/core/service.ts": true, "\\\\?\\C:\\virtual\\core\\service.ts": true, "\\\\?\\UNC\\server\\share\\core\\service.ts": true }
+eq("inventory Windows drive normalization", resolve_import_with_inventory("@/ui/../core/service", "main.ts", [], { "@": "C:\\virtual" }, "", platform_inventory)["resolved"], "C:/virtual/core/service.ts")
+eq("inventory UNC normalization", resolve_import_with_inventory("@/ui/../core/service", "main.ts", [], { "@": "\\\\server\\share" }, "", platform_inventory)["resolved"], "//server/share/core/service.ts")
+eq("inventory Windows verbatim normalization", resolve_import_with_inventory("@/ui/../core/service", "main.ts", [], { "@": "\\\\?\\C:\\virtual" }, "", platform_inventory)["resolved"], "\\\\?\\C:\\virtual\\core\\service.ts")
+eq("inventory Windows verbatim UNC normalization", resolve_import_with_inventory("@/ui/../core/service", "main.ts", [], { "@": "\\\\?\\UNC\\server\\share" }, "", platform_inventory)["resolved"], "\\\\?\\UNC\\server\\share\\core\\service.ts")
+eq("inventory drive parent traversal stays rooted", resolve_import_with_inventory("@/../../core/service", "main.ts", [], { "@": "C:/virtual" }, "", platform_inventory)["resolved"], "C:/core/service.ts")
+eq("inventory UNC parent traversal preserves share", resolve_import_with_inventory("@/../../core/service", "main.ts", [], { "@": "//server/share" }, "", platform_inventory)["resolved"], "//server/share/core/service.ts")
+eq("inventory directory index", resolve_import_with_inventory("virtual/pkg", "virtual/ui/view.ts", [], {}, "", inventory)["resolved"], "virtual/pkg/index.ts")
+eq("inventory Rust sibling", resolve_import_with_inventory("child", "virtual/rust/mod.rs", [], {}, "", inventory)["resolved"], "virtual/rust/child.rs")
+eq("inventory Python relative", resolve_import_with_inventory(".models", "virtual/python/main.py", [], {}, "", inventory)["resolved"], "virtual/python/models.py")
+eq("inventory Go module", resolve_import_with_inventory("example.com/app/domain", "virtual/main.go", ["virtual"], {}, "example.com/app", inventory)["resolved"], "virtual/domain/index.go")
+eq("empty inventory cannot see real relative source", resolve_import_with_inventory("../database/users", "tests/fixtures/sample/src/ui/Login.tsx", [], {}, "", {})["status"], "unknown")
+eq("inventory cannot see real absolute alias", resolve_import_with_inventory("@/database/users", "virtual/ui/view.ts", [], { "@": path_absolute("tests/fixtures/sample/src") }, "", inventory)["status"], "unknown")
+eq("inventory cannot traverse into ambient source", resolve_import_with_inventory("../../tests/fixtures/sample/src/database/users", "virtual/ui/view.ts", [], {}, "", inventory)["status"], "unknown")
+eq("snapshot selection uses roots and excludes", select_inventory_files(inventory, ["virtual"], ["**/*.ts"], ["virtual/pkg/**"]), ["virtual/core/service.ts", "virtual/ui/view.ts"])
+eq("snapshot root dot includes inventory", select_inventory_files(inventory, ["."], ["**/*.py"], []), ["virtual/python/models.py"])
+eq("snapshot source-root normalization", select_inventory_files(inventory, ["./virtual/./core/."], [], []), ["virtual/core/service.ts"])
+mut snapshot_root_rejected = false
+try { select_inventory_files(inventory, ["../ambient"], [], []) } except e { snapshot_root_rejected = true }
+ok("snapshot rejects escaping roots before walking", snapshot_root_rejected)
+mut snapshot_path_rejected = false
+try { select_inventory_files({ "../ambient.ts": true }, ["."], [], []) } except e { snapshot_path_rejected = true }
+ok("snapshot rejects escaping inventory paths", snapshot_path_rejected)
+mut malformed_inventory_rejected = false
+try { resolve_import_with_inventory("./x", "main.ts", [], {}, "", []) } except e { malformed_inventory_rejected = true }
+ok("malformed inventory fails closed", malformed_inventory_rejected)
+
+let snapshot_source = "tests/fixtures/sample/src/ui/Login.tsx"
+let snapshot_files = { "tests/fixtures/sample/src/ui/Login.tsx": true, "tests/fixtures/sample/src/database/users.ts": true }
+let snapshot_config = normalize_config({ "source_roots": ["tests/fixtures/sample/src"], "zones": { "ui": { "paths": ["tests/fixtures/sample/src/ui/**"], "cannot_depend_on": ["database"] }, "database": { "paths": ["tests/fixtures/sample/src/database/**"] } } })
+let snapshot_result = analyze_snapshot([snapshot_source], snapshot_config, snapshot_files)
+eq("snapshot analysis retains boundary violation", summarize(snapshot_result, snapshot_config)["status"], "failed")
+ok("snapshot API leaves caller configuration unchanged", has_key(snapshot_config, "resolution_inventory") == 0)
+let adapter_marker = "tests/tmp/snapshot-adapter.out"
+let adapter_command = ["kujo", "run", "tests/fixtures/snapshot_adapter.kujo", "--", adapter_marker]
+let adapter_control = run_adapter(snapshot_source, adapter_command)
+ok("snapshot adapter control actually runs", adapter_control["ok"] && file_exists(adapter_marker))
+delete_file(adapter_marker)
+mut snapshot_adapter_rejected = false
+mut adapter_snapshot_config = snapshot_config
+adapter_snapshot_config["parser_adapters"] = { ".tsx": adapter_command }
+try { analyze_snapshot([snapshot_source], adapter_snapshot_config, snapshot_files) } except e { snapshot_adapter_rejected = contains(to_string(e), "snapshot analysis does not execute parser adapters") == 1 }
+ok("snapshot refuses executable adapters", snapshot_adapter_rejected)
+ok("snapshot refused adapter has no effects", file_exists(adapter_marker) == false)
+mut snapshot_cache_rejected = false
+mut cache_snapshot_config = snapshot_config
+cache_snapshot_config["use_cache"] = true
+try { analyze_snapshot([snapshot_source], cache_snapshot_config, snapshot_files) } except e { snapshot_cache_rejected = true }
+ok("snapshot refuses ambient extraction caches", snapshot_cache_rejected)
+mut snapshot_missing_rejected = false
+try { analyze_snapshot([snapshot_source], snapshot_config, {}) } except e { snapshot_missing_rejected = true }
+ok("snapshot refuses unlisted source reads", snapshot_missing_rejected)
 
 // ---- summary ----
 print("")

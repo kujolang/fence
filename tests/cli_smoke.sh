@@ -316,6 +316,42 @@ fi
 expect_exit 0 "$(run check --output ./inside//new/report.json --format json)" "confined output creates parents and normalizes harmless separators"
 cd "$WORK" || exit 6
 
+# Every full-scan consumer enforces max_files before writing derived output.
+mkdir -p "$WORK/audit-limits/src"
+cd "$WORK/audit-limits" || exit 6
+printf 'export const a = 1\n' > src/a.ts
+printf 'export const b = 2\n' > src/b.ts
+printf '%s\n' '{"source_roots":["src"],"limits":{"max_files":1},"zones":{"all":{"paths":["src/**"]}}}' > fence.json
+printf 'baseline sentinel\n' > fence-baseline.json
+printf 'graph sentinel\n' > graph.json
+expect_exit 4 "$(run baseline create)" "baseline create enforces file ceiling"
+expect_exit 4 "$(run baseline prune)" "baseline prune enforces file ceiling"
+expect_exit 4 "$(run graph --observed --output graph.json)" "observed graph enforces file ceiling"
+if [ "$(cat fence-baseline.json)" = 'baseline sentinel' ] && [ "$(cat graph.json)" = 'graph sentinel' ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: budget errors changed existing output"; fi
+# Invalid exception dates cannot suppress violations or crash the audit command.
+printf '%s\n' '{"source_roots":["src"],"ignores":[{"reason":"migration","expires":"2999-99-99"}],"zones":{"all":{"paths":["src/**"]}}}' > fence.json
+expect_exit 2 "$(run validate)" "impossible expiry fails validation"
+expect_exit 2 "$(run check --fail-on none)" "impossible expiry cannot pass check"
+expect_exit 2 "$(run ignores check)" "impossible expiry fails before date audit"
+cd "$WORK" || exit 6
+
+# Lexical dot segments must not disguise a database import as a UI dependency.
+mkdir -p "$WORK/alias-boundary/src/ui" "$WORK/alias-boundary/src/database"
+cd "$WORK/alias-boundary" || exit 6
+printf 'export const users = 1\n' > src/database/users.ts
+expect_exit 0 "$(run init)" "alias boundary fixture config"
+printf 'import x from "@/ui/../database/users"\n' > src/ui/Bad.ts
+expect_exit 1 "$(run check --format json)" "alias dot segments cannot bypass denied zone"
+printf 'import x from "src/ui/../database/users"\n' > src/ui/Bad.ts
+expect_exit 1 "$(run check --cache --format json)" "direct dot segments cannot bypass denied zone"
+# POSIX filenames with a literal backslash must fail, never silently disappear.
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*) ;;
+  *) printf 'import x from "../database/users"\n' > 'src/ui/hidden\name.ts'
+     expect_exit 4 "$(run check --fail-on none)" "ambiguous backslash filename fails closed" ;;
+esac
+cd "$WORK" || exit 6
+
 echo ""
 echo "CLI smoke: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] || exit 1

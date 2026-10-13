@@ -11,7 +11,7 @@ from src.resolve import resolve_import_with_go
 from src.decisions import decide_dependency
 from src.validate import validate_config, count_errors
 from src.cliargs import flag_or
-from src.util import join_strings, dict_get
+from src.util import join_strings, dict_get, display_fields, display_rows, display_text
 
 export func cmd_explain(parsed) {
     let positionals = parsed["positionals"]
@@ -118,13 +118,15 @@ func explain_one(target, zone, imp, res, cfg, zones, zone_names) {
     }
 }
 
-func explain_human(a) {
+func explain_human(raw_analysis) {
+    mut a = display_fields(raw_analysis, false)
+    a["imports"] = display_rows(raw_analysis["imports"], false)
     mut o = ""
     o = o + "Explain: " + a["file"] + "\n"
     o = o + "=========" + "\n\n"
     o = o + "Zone: " + a["zone"] + "\n"
     if len(a["matched_zones"]) > 1 {
-        o = o + "Note: file matched multiple zones: " + join_strings(a["matched_zones"], ", ") + " (first wins)\n"
+        o = o + "Note: file matched multiple zones: " + display_text(join_strings(a["matched_zones"], ", "), false) + " (first wins)\n"
     }
     o = o + "In scope: " + to_string(a["in_scope"]) + "\n"
     o = o + "Allowed dependencies: " + list_or_none(a["allowed"]) + "\n"
@@ -158,5 +160,5 @@ func list_or_none(arr) {
     if len(arr) == 0 {
         return "(none)"
     }
-    return join_strings(arr, ", ")
+    return display_text(join_strings(arr, ", "), false)
 }
