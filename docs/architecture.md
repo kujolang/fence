@@ -153,6 +153,11 @@ validated Fence config. `inventory` is a dictionary whose keys are the available
 regular-file paths, including targets that are not selected for analysis; values
 are ignored. Every analyzed source must be present in that inventory.
 
+`src.walk.select_inventory_files(inventory, source_roots, include, exclude)`
+selects source paths without a filesystem walk, using the normal glob matcher.
+It rejects escaping roots and non-normalized inventory paths. Root `.` selects
+from the whole inventory; returned paths are sorted.
+
 The API rejects configured parser adapters and persistent extraction caching.
 It uses the same extraction, resolution precedence, zone rules, exception policy,
 limits and result shape as ordinary analysis. Resolution only consults the

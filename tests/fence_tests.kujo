@@ -30,7 +30,7 @@ from src.baseline import fingerprint, baseline_from_result, apply_baseline, prun
 from src.rules import check_external
 from src.reports import render_human, render_markdown
 from src.graph import render_graph_json, render_graph_dot, render_graph_human
-from src.walk import walk
+from src.walk import walk, select_inventory_files
 from src.meta import no_config_text
 from src.output import output_root_allowed
 from src.walk import include_extensions, walk_profile
@@ -614,6 +614,15 @@ eq("inventory Go module", resolve_import_with_inventory("example.com/app/domain"
 eq("empty inventory cannot see real relative source", resolve_import_with_inventory("../database/users", "tests/fixtures/sample/src/ui/Login.tsx", [], {}, "", {})["status"], "unknown")
 eq("inventory cannot see real absolute alias", resolve_import_with_inventory("@/database/users", "virtual/ui/view.ts", [], { "@": path_absolute("tests/fixtures/sample/src") }, "", inventory)["status"], "unknown")
 eq("inventory cannot traverse into ambient source", resolve_import_with_inventory("../../tests/fixtures/sample/src/database/users", "virtual/ui/view.ts", [], {}, "", inventory)["status"], "unknown")
+eq("snapshot selection uses roots and excludes", select_inventory_files(inventory, ["virtual"], ["**/*.ts"], ["virtual/pkg/**"]), ["virtual/core/service.ts", "virtual/ui/view.ts"])
+eq("snapshot root dot includes inventory", select_inventory_files(inventory, ["."], ["**/*.py"], []), ["virtual/python/models.py"])
+eq("snapshot source-root normalization", select_inventory_files(inventory, ["./virtual/./core/."], [], []), ["virtual/core/service.ts"])
+mut snapshot_root_rejected = false
+try { select_inventory_files(inventory, ["../ambient"], [], []) } except e { snapshot_root_rejected = true }
+ok("snapshot rejects escaping roots before walking", snapshot_root_rejected)
+mut snapshot_path_rejected = false
+try { select_inventory_files({ "../ambient.ts": true }, ["."], [], []) } except e { snapshot_path_rejected = true }
+ok("snapshot rejects escaping inventory paths", snapshot_path_rejected)
 mut malformed_inventory_rejected = false
 try { resolve_import_with_inventory("./x", "main.ts", [], {}, "", []) } except e { malformed_inventory_rejected = true }
 ok("malformed inventory fails closed", malformed_inventory_rejected)

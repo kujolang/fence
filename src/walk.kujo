@@ -6,7 +6,7 @@
 
 from src.glob import glob_match_any
 from src.util import sort_strings, arr_has
-from src.paths import file_ext
+from src.paths import file_ext, is_safe_output, normalize_sep
 
 // Collect repo-relative file paths under `source_roots` that match an include
 // pattern and no exclude pattern. `.git` is always skipped.
@@ -14,6 +14,53 @@ from src.paths import file_ext
 // Returns a sorted array of paths (deterministic order).
 export func walk(source_roots, include_patterns, exclude_patterns) {
     return filter_files(collect_files(source_roots, exclude_patterns), include_patterns, exclude_patterns)
+}
+
+// Select from a host-owned inventory without walking or probing the filesystem.
+// Preserve the normal include/exclude matcher and deterministic result order.
+export func select_inventory_files(inventory, source_roots, include_patterns, exclude_patterns) {
+    if type_of(inventory) != "dict" { throw("snapshot inventory must be a dictionary") }
+    mut roots = []
+    mut ri = 0
+    while ri < len(source_roots) {
+        let raw_root = source_roots[ri]
+        if type_of(raw_root) != "string" || is_safe_output(raw_root) == false { throw("snapshot source roots must be relative and cannot traverse parents") }
+        let root_parts = split(normalize_sep(raw_root), "/")
+        mut root = ""
+        mut rpi = 0
+        while rpi < len(root_parts) {
+            if root_parts[rpi] != "" && root_parts[rpi] != "." {
+                if root != "" { root = root + "/" }
+                root = root + root_parts[rpi]
+            }
+            rpi = rpi + 1
+        }
+        if root == "" { root = "." }
+        roots = push(roots, root)
+        ri = ri + 1
+    }
+    let names = keys(inventory)
+    mut candidates = []
+    mut fi = 0
+    while fi < len(names) {
+        let file = names[fi]
+        if is_safe_output(file) == false || normalize_sep(file) != file { throw("snapshot inventory paths must be portable and relative") }
+        let segments = split(file, "/")
+        mut pi = 0
+        while pi < len(segments) {
+            if segments[pi] == "" || segments[pi] == "." { throw("snapshot inventory paths must be normalized") }
+            pi = pi + 1
+        }
+        mut selected = false
+        mut ti = 0
+        while ti < len(roots) {
+            if roots[ti] == "." || starts_with(file, roots[ti] + "/") { selected = true }
+            ti = ti + 1
+        }
+        if selected { candidates = push(candidates, file) }
+        fi = fi + 1
+    }
+    return filter_files(candidates, include_patterns, exclude_patterns)
 }
 
 export func walk_profile(source_roots, include_patterns, exclude_patterns) {
