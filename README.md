@@ -205,6 +205,13 @@ docs/                   documentation
 agent/                  ignored archive of implementation prompts and handoffs
 ```
 
+## Embedding in a host
+
+Hosts with private source snapshots can use the native `analyze_snapshot` library
+API to restrict import resolution to a supplied file inventory and reject
+executable parser adapters. The host remains responsible for bounded source
+reads and process limits. See [Snapshot integration](docs/architecture.md#embedding-a-private-snapshot).
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the module map, the Kujo VM quirks to

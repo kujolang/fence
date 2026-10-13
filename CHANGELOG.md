@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — snapshot integration, 2026-10-13
+
+- Add inventory-backed native import resolution and `analyze_snapshot` for hosts
+  using private source copies. Missing inventory entries never fall back to the
+  filesystem; executable parser adapters and persistent caches are rejected.
+  Existing CLI resolution and report contracts remain unchanged.
+
 ## Unreleased — repository hardening, 2026-09-22
 
 - Normalize all resolved import candidates before zone matching to close alias
