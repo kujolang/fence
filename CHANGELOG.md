@@ -2,6 +2,7 @@
 
 ## Unreleased — snapshot integration, 2026-10-13
 
+- Preserve Windows drive, UNC and extended-path prefixes when normalizing import candidates.
 - Add inventory-backed native import resolution and `analyze_snapshot` for hosts
   using private source copies. Missing inventory entries never fall back to the
   filesystem; executable parser adapters and persistent caches are rejected.

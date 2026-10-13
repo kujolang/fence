@@ -607,6 +607,14 @@ ok("go_module type rejected before resolution", count_errors(validate_config(nor
 let inventory = { "virtual/ui/view.ts": true, "virtual/core/service.ts": true, "virtual/pkg/index.ts": true, "virtual/rust/child.rs": true, "virtual/python/models.py": true, "virtual/domain/index.go": true }
 eq("inventory relative normalization", resolve_import_with_inventory("../ui/../core/service", "virtual/ui/view.ts", [], {}, "", inventory)["resolved"], "virtual/core/service.ts")
 eq("inventory alias normalization", resolve_import_with_inventory("@/ui/../core/service", "virtual/ui/view.ts", [], { "@": "virtual" }, "", inventory)["resolved"], "virtual/core/service.ts")
+// Pure inventories exercise platform path identities without ambient lookups.
+let platform_inventory = { "C:/core/service.ts": true, "C:/virtual/core/service.ts": true, "//server/share/core/service.ts": true, "\\\\?\\C:\\virtual\\core\\service.ts": true, "\\\\?\\UNC\\server\\share\\core\\service.ts": true }
+eq("inventory Windows drive normalization", resolve_import_with_inventory("@/ui/../core/service", "main.ts", [], { "@": "C:\\virtual" }, "", platform_inventory)["resolved"], "C:/virtual/core/service.ts")
+eq("inventory UNC normalization", resolve_import_with_inventory("@/ui/../core/service", "main.ts", [], { "@": "\\\\server\\share" }, "", platform_inventory)["resolved"], "//server/share/core/service.ts")
+eq("inventory Windows verbatim normalization", resolve_import_with_inventory("@/ui/../core/service", "main.ts", [], { "@": "\\\\?\\C:\\virtual" }, "", platform_inventory)["resolved"], "\\\\?\\C:\\virtual\\core\\service.ts")
+eq("inventory Windows verbatim UNC normalization", resolve_import_with_inventory("@/ui/../core/service", "main.ts", [], { "@": "\\\\?\\UNC\\server\\share" }, "", platform_inventory)["resolved"], "\\\\?\\UNC\\server\\share\\core\\service.ts")
+eq("inventory drive parent traversal stays rooted", resolve_import_with_inventory("@/../../core/service", "main.ts", [], { "@": "C:/virtual" }, "", platform_inventory)["resolved"], "C:/core/service.ts")
+eq("inventory UNC parent traversal preserves share", resolve_import_with_inventory("@/../../core/service", "main.ts", [], { "@": "//server/share" }, "", platform_inventory)["resolved"], "//server/share/core/service.ts")
 eq("inventory directory index", resolve_import_with_inventory("virtual/pkg", "virtual/ui/view.ts", [], {}, "", inventory)["resolved"], "virtual/pkg/index.ts")
 eq("inventory Rust sibling", resolve_import_with_inventory("child", "virtual/rust/mod.rs", [], {}, "", inventory)["resolved"], "virtual/rust/child.rs")
 eq("inventory Python relative", resolve_import_with_inventory(".models", "virtual/python/main.py", [], {}, "", inventory)["resolved"], "virtual/python/models.py")
