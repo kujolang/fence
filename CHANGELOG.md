@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased — snapshot integration, 2026-10-13
+## [1.1.0] - 2026-10-14
+
+- Inventory-backed snapshot analysis; incremental caches, policy governance, expanded import resolution, confined output publication, and deterministic integrity artifacts. Requires Kujo 1.4.0 or newer.
+
+### Snapshot integration (2026-10-13)
 
 - Preserve Windows drive, UNC and extended-path prefixes when normalizing import candidates.
 - Add inventory-backed native import resolution and `analyze_snapshot` for hosts
@@ -8,7 +12,7 @@
   filesystem; executable parser adapters and persistent caches are rejected.
   Existing CLI resolution and report contracts remain unchanged.
 
-## Unreleased — repository hardening, 2026-09-22
+### Repository hardening (2026-09-22)
 
 - Normalize all resolved import candidates before zone matching to close alias
   and direct-path dot-segment boundary bypasses.
@@ -25,7 +29,7 @@ All notable changes to Fence are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to
 follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+### Earlier implementation record
 
 ### Remaining audit work (2026-09-07)
 - Bounded disposable built-in caches to 4 MiB and 10,000 records; compacted
