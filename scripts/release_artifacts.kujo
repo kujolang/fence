@@ -1,3 +1,5 @@
+from src.paths import safe_output_path
+
 // Generate deterministic checksums, an SPDX-shaped SBOM, and SLSA-shaped
 // provenance for the Kujo source distribution. Signing remains a publisher
 // responsibility so private keys never enter Fence.
@@ -5,12 +7,12 @@
 mut output = "dist/release"
 let argv = args()
 if len(argv) == 2 && argv[0] == "--output" { output = argv[1] }
-if len(argv) != 0 && len(argv) != 2 {
+if len(argv) != 0 && (len(argv) != 2 || argv[0] != "--output") {
     print("Usage: kujo run scripts/release_artifacts.kujo -- [--output DIR]")
     exit(2)
 }
 
-if path_is_dir(output) == false { create_dir(output) }
+output = safe_output_path(output)
 mut files = ["fence.kujo", "fence.sh", "kennel.toml", "README.md", "LICENSE", "CHANGELOG.md", "SECURITY.md"]
 let src_names = sort(list_dir("src"))
 mut i = 0
@@ -41,7 +43,7 @@ let provenance = {
         "runDetails": { "builder": { "id": "local-kujo" } }
     }
 }
-write_file(output + "/SHA256SUMS", checksums, true)
-write_file(output + "/sbom.spdx.json", to_json_pretty(sbom), true)
-write_file(output + "/provenance.intoto.json", to_json_pretty(provenance), true)
+write_file_atomic_beneath(".", output + "/SHA256SUMS", checksums, true)
+write_file_atomic_beneath(".", output + "/sbom.spdx.json", to_json_pretty(sbom), true)
+write_file_atomic_beneath(".", output + "/provenance.intoto.json", to_json_pretty(provenance), true)
 print("Wrote deterministic release integrity artifacts to " + output)

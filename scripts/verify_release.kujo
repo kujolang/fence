@@ -12,7 +12,7 @@ if len(argv) != 0 && (len(argv) != 2 || argv[0] != "--kujo") {
 
 func run_gate(label, command, cwd, expected) {
     let result = spawn_process(command, { "cwd": cwd, "timeout_ms": 600000, "max_output_bytes": 4194304, "env": { "KUJO": kujo } })
-    if result.exitcode != expected {
+    if result.exitcode != expected || result.stdout_truncated || result.stderr_truncated {
         eprint("FAIL: " + label + " (exit " + to_string(result.exitcode) + ", expected " + to_string(expected) + ")")
         if trim(result.stdout) != "" { eprint(result.stdout) }
         if trim(result.stderr) != "" { eprint(result.stderr) }
@@ -47,17 +47,43 @@ run_gate("failing web example", [kujo, "run", entry, "--", "check"], path_join(r
 run_gate("passing monorepo example", [kujo, "run", entry, "--", "check"], path_join(root, "examples/monorepo/passing"), 0)
 run_gate("failing monorepo example", [kujo, "run", entry, "--", "check"], path_join(root, "examples/monorepo/failing"), 1)
 
-let release_dir = path_join(root, ".fence-release-verify-" + uuid_v4())
+let release_dir = ".fence-release-verify-" + uuid_v4()
 run_gate("release integrity generation", [kujo, "run", "scripts/release_artifacts.kujo", "--", "--output", release_dir], root, 0)
-let artifacts = ["SHA256SUMS", "sbom.spdx.json", "provenance.intoto.json"]
+let receipt_artifacts = ["SHA256SUMS", "sbom.spdx.json", "provenance.intoto.json"]
+let receipt_checksums = read_file_beneath(".", path_join(release_dir, receipt_artifacts[0]), 1048576)
+let receipt_sbom = parse_json(read_file_beneath(".", path_join(release_dir, receipt_artifacts[1]), 1048576))
+let receipt_provenance = parse_json(read_file_beneath(".", path_join(release_dir, receipt_artifacts[2]), 1048576))
+mut release_files = ["fence.kujo", "fence.sh", "kennel.toml", "README.md", "LICENSE", "CHANGELOG.md", "SECURITY.md"]
+mut ri = 0
+while ri < len(source_names) {
+    if ends_with(source_names[ri], ".kujo") { release_files = push(release_files, "src/" + source_names[ri]) }
+    ri = ri + 1
+}
+release_files = sort(release_files)
+let receipt_lines = split(receipt_checksums, "\n")
+let receipt_components = receipt_sbom["files"]
+mut receipt_valid = receipt_sbom["spdxVersion"] == "SPDX-2.3" && len(receipt_components) == len(release_files)
+receipt_valid = receipt_valid && receipt_provenance["_type"] == "https://in-toto.io/Statement/v1"
+receipt_valid = receipt_valid && receipt_provenance["subject"][0]["digest"]["sha256"] == sha256(receipt_checksums)
+receipt_valid = receipt_valid && len(receipt_lines) == len(release_files) + 1 && receipt_lines[len(receipt_lines) - 1] == ""
 mut ai = 0
-while ai < len(artifacts) {
-    if path_is_file(path_join(release_dir, artifacts[ai])) == false {
-        eprint("FAIL: missing release artifact " + artifacts[ai])
-        exit(1)
-    }
-    delete_file(path_join(release_dir, artifacts[ai]))
+while receipt_valid && ai < len(release_files) {
+    let receipt_name = release_files[ai]
+    let receipt_digest = sha256_file(receipt_name)
+    let receipt_recorded = receipt_components[ai]
+    receipt_valid = receipt_lines[ai] == receipt_digest + "  " + receipt_name && receipt_recorded["name"] == receipt_name
+    receipt_valid = receipt_valid && receipt_recorded["hashes"][0]["alg"] == "SHA-256" && receipt_recorded["hashes"][0]["content"] == receipt_digest
+    ai = ai + 1
+}
+ai = 0
+while ai < len(receipt_artifacts) {
+    delete_file(path_join(release_dir, receipt_artifacts[ai]))
     ai = ai + 1
 }
 os_rmdir(release_dir)
+if receipt_valid == false {
+    eprint("FAIL: release artifact integrity mismatch")
+    exit(1)
+}
+print("PASS: release integrity verification")
 print("Fence release verification passed.")
