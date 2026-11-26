@@ -40,9 +40,10 @@ Fence is local-first and minimizes its trust surface by design:
 - **Auditable exceptions.** Structured ignores require a reason and expiry and
   remain visible in machine reports.
 - **Confined composition.** `extends` is local-only, depth/cycle limited, and
-  rejects traversal, absolute paths, and symlink escapes.
-- **Confined cache.** The optional `.fence` cache rejects symlinked-directory
-  escapes, including a cache-file symlink, and validates import-record shapes.
+  rejects traversal, absolute paths, and symlink components. Files are read
+  beneath the working directory with a 1 MiB cap and at most 256 reads.
+- **Confined cache.** The optional `.fence` cache uses bounded reads beneath the repository, rejects symlink components, and
+  validates import-record shapes.
   It stores source digests and import records, not complete files. The cache is
   trusted local acceleration data, not authenticated evidence: a writer can forge
   a structurally valid entry. Omit `--cache` for adversary-writable cache state.
@@ -51,6 +52,7 @@ Fence is local-first and minimizes its trust surface by design:
 
 | Version | Supported |
 | --- | --- |
+| 1.1.x | ✅ |
 | 1.0.x | ✅ |
 
 ## Reporting a vulnerability

@@ -152,6 +152,31 @@ git add .
 expect_exit 1 "$(run check --changed-only)" "changed-only staged quoted filename"
 cd "$WORK" || exit 6
 
+# Git and the full walker use the same normalized source roots and scope.
+mkdir -p "$WORK/scope/src/client" "$WORK/scope/tools"
+cd "$WORK/scope" || exit 6
+git init -q
+git -c user.name=Fence -c user.email=fence@example.invalid commit -q --allow-empty -m baseline
+printf 'import x from "blocked"\n' > tools/unselected.ts
+printf 'export const ready = true\n' > src/client/ready.ts
+cat > fence.json <<'JSON'
+{"version":1,"source_roots":["./src/.", "src/client"],"scan":{"include":["**/*.ts"],"exclude":[]},"external":{"deny":["blocked"]},"zones":{"all":{"paths":["**/*.ts"]}}}
+JSON
+expect_exit 0 "$(run check --changed-only)" "changed-only honors source roots"
+F="$("$KUJO" run "$FENCE" -- check --format json 2>/dev/null)"
+G="$("$KUJO" run "$FENCE" -- check --changed-only --format json 2>/dev/null)"
+case "$F" in
+  *'"files_scanned": 1'*) PASS=$((PASS+1));;
+  *) FAIL=$((FAIL+1)); echo "FAIL: overlapping normalized roots scan shared file once";;
+esac
+if [ "$F" = "$G" ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: normalized full and changed-only scope agree"; fi
+
+printf 'import x from "blocked"\n' > root.ts
+printf '%s\n' '{"version":1,"source_roots":["."],"scan":{"include":["root.ts"]},"external":{"deny":["blocked"]},"zones":{"all":{"paths":["root.ts"]}}}' > fence.json
+expect_exit 1 "$(run check)" "dot root preserves exact file pattern identity"
+expect_exit 1 "$(run check --changed-only)" "changed-only accepts dot root"
+cd "$WORK" || exit 6
+
 # Source directory cycles fail promptly; excluded cycles are never traversed.
 if ln -s . "$WORK/changed/src/loop" 2>/dev/null; then
   cd "$WORK/changed" || exit 6
@@ -179,8 +204,27 @@ if [ "$(cat output-parent)" = original ]; then PASS=$((PASS+1)); else FAIL=$((FA
 cd "$WORK/changed" || exit 6
 printf '%s\n' '{"version":1,"source_roots":["src"],"parser_adapters":{".ts":["git","--fence-invalid-option"]},"zones":{"all":{"paths":["src/**"]}}}' > fence.json
 expect_exit 4 "$(run check --format json)" "adapter failure makes scan incomplete"
+mkdir -p .fence
+printf 'fixture cache\n' > .fence/cache-v1.json
+expect_exit 4 "$(run check --cache)" "incomplete scan keeps existing cache"
+if [ "$(cat .fence/cache-v1.json)" = 'fixture cache' ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); echo "FAIL: incomplete scan replaced cache"; fi
 expect_exit 4 "$(run baseline create)" "incomplete scan refuses baseline"
 expect_exit 4 "$(run graph --observed)" "incomplete scan refuses observed graph"
+cd "$WORK" || exit 6
+
+# Nested config edges validate the supplied reference before joining paths.
+mkdir -p "$WORK/composition/policy"
+cd "$WORK/composition" || exit 6
+printf '%s\n' '{"extends":["policy/child.json"]}' > fence.json
+printf '%s\n' '{"extends":["/base.json"]}' > policy/child.json
+printf '%s\n' '{"version":1,"zones":{"all":{"paths":["src/**"]}}}' > policy/base.json
+expect_exit 3 "$(run validate)" "nested config rejects absolute references"
+printf '%s\n' '{"extends":["./child.json"]}' > policy/child.json
+expect_exit 3 "$(run validate)" "normalized config paths identify cycles"
+printf 'mut refs = []\nfor i in range(256) { refs = push(refs, "policy/base.json") }\nwrite_file("fence.json", to_json({"extends": refs}), true)\n' > build.kujo
+"$KUJO" run build.kujo >/dev/null 2>&1
+expect_exit 0 "$?" "composition budget fixture is valid"
+expect_exit 3 "$(run validate)" "composition rejects excess references before loading"
 cd "$WORK" || exit 6
 
 # Package directory names are TOML data, including quotes and whitespace.

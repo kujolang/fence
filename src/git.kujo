@@ -108,26 +108,17 @@ func parse_paths(text) {
 }
 
 func append_unique(base, extra) {
-    mut out = base
-    let n = len(extra)
+    mut seen = {}
+    mut out = []
+    let paths = concat(base, extra)
     mut i = 0
-    while i < n {
-        if contains_path(out, extra[i]) == false {
-            out = push(out, extra[i])
+    while i < len(paths) {
+        let path = paths[i]
+        if has_key(seen, path) == 0 {
+            seen[path] = true
+            out = push(out, path)
         }
         i = i + 1
     }
     return out
-}
-
-func contains_path(arr, p) {
-    let n = len(arr)
-    mut i = 0
-    while i < n {
-        if arr[i] == p {
-            return true
-        }
-        i = i + 1
-    }
-    return false
 }

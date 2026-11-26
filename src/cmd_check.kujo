@@ -3,13 +3,12 @@
 
 from src.config import load_config
 from src.validate import validate_config, count_errors
-from src.walk import walk
+from src.walk import walk, filter_changed_files
 from src.analyze import analyze_files
 from src.reports import summarize, render_human, render_json, render_markdown, render_sarif
 from src.output import write_safe_under
 from src.cliargs import flag_or, has_flag
 from src.git import changed_files
-from src.glob import glob_match
 from src.baseline import load_baseline, apply_baseline
 from src.meta import no_config_text
 from src.util import utf8_byte_length
@@ -60,15 +59,6 @@ export func cmd_check(parsed) {
     }
 
     mut result = analyze_files(files, cfg)
-    if cfg["use_cache"] {
-        let saved_cache = save_cache(result["import_cache"])
-        if saved_cache["ok"] == false { print("Error: " + saved_cache["error"]); return 5 }
-    }
-    if cfg["max_imports"] > 0 && result["imports_checked"] > cfg["max_imports"] {
-        print("Error: resource limit exceeded: " + to_string(result["imports_checked"]) + " imports checked, limit is " + to_string(cfg["max_imports"]))
-        return 4
-    }
-
     // Optional baseline suppression of pre-existing violations.
     mut suppressed = 0
     if has_flag(flags, "baseline") {
@@ -100,6 +90,11 @@ export func cmd_check(parsed) {
             print("Error: resource limit exceeded: report is " + to_string(report_bytes) + " bytes, limit is " + to_string(cfg["max_report_bytes"]))
             return 4
         }
+    }
+
+    if cfg["use_cache"] && summary["skipped_files"] == 0 {
+        let saved_cache = save_cache(result["import_cache"])
+        if saved_cache["ok"] == false { print("Error: " + saved_cache["error"]); return 5 }
     }
 
     let quiet = has_flag(flags, "quiet")
@@ -183,54 +178,9 @@ func select_files(cfg, flags) {
             return { "ok": false, "error": ch["error"], "code": ch["code"], "files": [] }
         }
         // Filter changed files through include/exclude + existence.
-        let filtered = filter_changed(ch["files"], cfg)
+        let filtered = filter_changed_files(ch["files"], cfg["source_roots"], cfg["include"], cfg["exclude"])
         return { "ok": true, "error": "", "code": 0, "files": filtered }
     }
     let files = walk(cfg["source_roots"], cfg["include"], cfg["exclude"])
     return { "ok": true, "error": "", "code": 0, "files": files }
-}
-
-func filter_changed(changed, cfg) {
-    let include = cfg["include"]
-    let exclude = cfg["exclude"]
-    mut out = []
-    let n = len(changed)
-    mut i = 0
-    while i < n {
-        let f = changed[i]
-        if file_exists(f) {
-            if is_scan_target(f, include, exclude) {
-                out = push(out, f)
-            }
-        }
-        i = i + 1
-    }
-    return out
-}
-
-func is_scan_target(f, include, exclude) {
-    let inc = matches_list(f, include)
-    if inc == false {
-        return false
-    }
-    if len(exclude) > 0 && matches_list(f, exclude) {
-        return false
-    }
-    return true
-}
-
-// Local include/exclude check (imported indirectly to avoid extra frames).
-func matches_list(f, patterns) {
-    let n = len(patterns)
-    if n == 0 {
-        return true
-    }
-    mut i = 0
-    while i < n {
-        if glob_match(patterns[i], f) {
-            return true
-        }
-        i = i + 1
-    }
-    return false
 }

@@ -106,7 +106,8 @@ CI expiry gate. `--fail-expiring` also fails entries inside the review window.
 first; the child overrides scalar values and merges `zones`, `aliases`,
 `external`, `scan`, `limits`, and `parser_adapters` one level. Fence rejects
 cycles, chains deeper than 16, parent traversal, absolute paths, and symlink
-escapes. Composition performs no network access.
+components. A composition allows up to 256 file reads and up to 1 MiB per file.
+Composition performs no network access.
 
 ## `[parser_adapters]` (optional)
 
@@ -128,7 +129,9 @@ reviewed configuration and pin their installation outside Fence.
 | `include` | string[] | Glob patterns a file must match to be scanned. Empty = include all. |
 | `exclude` | string[] | Glob patterns that remove files from scanning. `.git` is always skipped. Fully excluded literal subtrees are pruned before
 reading their contents; other globs still filter individual files. Identical
-source roots are visited once. Directory symlink cycles and unreadable
+source roots are visited once after relative path normalization. Git-scoped
+checks select changed files within those same repository roots. Directory
+symlink cycles and unreadable
 directories fail the scan; non-file special entries are not read. |
 
 Glob support is pragmatic: `**/*.ext` (suffix), `prefix/**` (tree),

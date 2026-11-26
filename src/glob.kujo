@@ -154,6 +154,7 @@ func segment_match(pseg, xseg) {
     if pseg == xseg {
         return true
     }
+    if contains(pseg, "*") == 0 && contains(pseg, "?") == 0 { return false }
     let pat = to_chars(pseg)
     let str = to_chars(xseg)
     let pn = len(pat)

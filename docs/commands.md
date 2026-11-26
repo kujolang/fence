@@ -41,7 +41,7 @@ kujo run fence.kujo -- check --quiet
 | `--format <fmt>` | `human` (default), `json`, `markdown`, `sarif` |
 | `--output <path>` | Write the report to a repo-relative file (path-safe) |
 | `--fail-on <level>` | `none`, `warning`, `error` (overrides config) |
-| `--changed-only` | Only scan files changed vs a Git base |
+| `--changed-only` | Only scan files under source roots changed vs a Git base |
 | `--base <ref>` | Git base ref for `--changed-only` (default `HEAD`) |
 | `--baseline` | Suppress violations recorded in `fence-baseline.json` |
 | `--cache` | Reuse content-digest import extraction under `.fence/cache-v1.json` |
@@ -174,8 +174,10 @@ Prints the Fence release string and exits `0`.
 
 `check --cache` stores disposable built-in extraction records in
 `.fence/cache-v1.json`. The file is capped at 4 MiB and 10,000 entries; oversized
-or incompatible caches are ignored. Each successful save retains only files
-visited in that scan, including all sequential shards. Deleted, excluded and
+or incompatible caches are ignored. Cache reads require regular files beneath
+the repository with no symlink components. Each successful save retains only files
+visited in a complete scan, including all sequential shards. Incomplete scans
+leave any previous cache intact. Deleted, excluded and
 unselected paths are removed; changed-only runs can therefore reduce later hit
 rates. Entries exceeding retention limits are still analyzed completely.
 Extractor version 3 invalidates older entries automatically. Custom parser

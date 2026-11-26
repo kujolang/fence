@@ -77,12 +77,8 @@ export func parent_dir(path) {
 
 // Return the final component of a path.
 export func base_name(path) {
-    let p = normalize_sep(path)
-    let idx = last_index_of_slash(p)
-    if idx < 0 {
-        return p
-    }
-    return substring(p, idx + 1, len(p))
+    let parts = split(normalize_sep(path), "/")
+    return parts[len(parts) - 1]
 }
 
 // Character-based search for the last `/` (avoids byte/char mismatch issues by
@@ -105,22 +101,20 @@ export func last_index_of_slash(p) {
 
 // Lowercase file extension including the dot, or "" if none.
 export func file_ext(path) {
-    let b = base_name(path)
+    let parts = split(base_name(path), ".")
+    if len(parts) == 1 { return "" }
+    return "." + to_lower(parts[len(parts) - 1])
+}
+
+// Normalize an already validated repository-relative path.
+export func normalize_relative(path) {
+    let parts = split(normalize_sep(path), "/")
+    mut clean = []
     mut i = 0
-    mut dot = -1
-    loop {
-        let ch = substring(b, i, i + 1)
-        if ch == "" {
-            i = -1
-            break
-        }
-        if ch == "." {
-            dot = i
-        }
+    while i < len(parts) {
+        if parts[i] != "" && parts[i] != "." { clean = push(clean, parts[i]) }
         i = i + 1
     }
-    if dot < 0 {
-        return ""
-    }
-    return to_lower(substring(b, dot, len(b)))
+    if len(clean) == 0 { return "." }
+    return join(clean, "/")
 }

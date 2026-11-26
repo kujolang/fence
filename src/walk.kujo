@@ -6,7 +6,7 @@
 
 from src.glob import glob_match_any
 from src.util import sort_strings, arr_has
-from src.paths import file_ext, is_safe_output, normalize_sep
+from src.paths import file_ext, is_safe_output, normalize_sep, normalize_relative
 
 // Collect repo-relative file paths under `source_roots` that match an include
 // pattern and no exclude pattern. `.git` is always skipped.
@@ -25,18 +25,7 @@ export func select_inventory_files(inventory, source_roots, include_patterns, ex
     while ri < len(source_roots) {
         let raw_root = source_roots[ri]
         if type_of(raw_root) != "string" || is_safe_output(raw_root) == false { throw("snapshot source roots must be relative and cannot traverse parents") }
-        let root_parts = split(normalize_sep(raw_root), "/")
-        mut root = ""
-        mut rpi = 0
-        while rpi < len(root_parts) {
-            if root_parts[rpi] != "" && root_parts[rpi] != "." {
-                if root != "" { root = root + "/" }
-                root = root + root_parts[rpi]
-            }
-            rpi = rpi + 1
-        }
-        if root == "" { root = "." }
-        roots = push(roots, root)
+        roots = push(roots, normalize_relative(raw_root))
         ri = ri + 1
     }
     let names = keys(inventory)
@@ -51,16 +40,46 @@ export func select_inventory_files(inventory, source_roots, include_patterns, ex
             if segments[pi] == "" || segments[pi] == "." { throw("snapshot inventory paths must be normalized") }
             pi = pi + 1
         }
-        mut selected = false
-        mut ti = 0
-        while ti < len(roots) {
-            if roots[ti] == "." || starts_with(file, roots[ti] + "/") { selected = true }
-            ti = ti + 1
-        }
-        if selected { candidates = push(candidates, file) }
+        if under_source_roots(file, roots) { candidates = push(candidates, file) }
         fi = fi + 1
     }
     return filter_files(candidates, include_patterns, exclude_patterns)
+}
+
+// Git provides repo-relative filenames. Convert in-repo absolute roots to the
+// same spelling and retain the walker's lexical identity for relative roots.
+export func filter_changed_files(files, source_roots, include_patterns, exclude_patterns) {
+    let cwd = normalize_sep(os_getcwd())
+    mut roots = []
+    mut i = 0
+    while i < len(source_roots) {
+        let raw = normalize_sep(source_roots[i])
+        if is_safe_output(raw) { roots = push(roots, normalize_relative(raw)) }
+        else if raw == cwd { roots = push(roots, ".") }
+        else if starts_with(raw, cwd + "/") { roots = push(roots, normalize_relative(substring(raw, len(cwd) + 1, len(raw)))) }
+        i = i + 1
+    }
+    let matched = filter_files(files, include_patterns, exclude_patterns)
+    mut out = []
+    mut j = 0
+    while j < len(matched) {
+        let path = matched[j]
+        if under_source_roots(path, roots) && path_is_file(path) {
+            if contains(path, "\\") == 1 { throw("unsupported source filename containing backslash: " + to_json(path)) }
+            out = push(out, path)
+        }
+        j = j + 1
+    }
+    return out
+}
+
+func under_source_roots(file, roots) {
+    mut i = 0
+    while i < len(roots) {
+        if roots[i] == "." || starts_with(file, roots[i] + "/") { return true }
+        i = i + 1
+    }
+    return false
 }
 
 export func walk_profile(source_roots, include_patterns, exclude_patterns) {
@@ -83,7 +102,8 @@ func collect_files(source_roots, exclude_patterns) {
     let rn = len(source_roots)
     mut ri = 0
     while ri < rn {
-        let root = source_roots[ri]
+        mut root = source_roots[ri]
+        if is_safe_output(root) { root = normalize_relative(root) }
         if path_is_dir(root) {
             stack = push(stack, { "path": root, "ancestors": [] })
         }
@@ -112,7 +132,8 @@ func collect_files(source_roots, exclude_patterns) {
             // A literal POSIX backslash is not a directory separator. Fence's
             // portable glob/path model cannot represent it without ambiguity.
             if contains(name, "\\") == 1 { throw("unsupported source filename containing backslash: " + to_json(name)) }
-            let full = dir + "/" + name
+            mut full = name
+            if dir != "." { full = dir + "/" + name }
             if name == ".git" {
                 // skip
             } else {

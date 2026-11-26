@@ -4,7 +4,7 @@ from src.util import dict_has, dict_get, utf8_byte_length
 from src.imports import extract_for_ext, detect_imports_with_adapters
 from src.parser_adapters import adapter_for
 from src.output import write_safe
-from src.paths import normalize_sep, file_ext
+from src.paths import file_ext
 
 func cache_path() { return ".fence/cache-v1.json" }
 export func cache_max_bytes() { return 4194304 }
@@ -18,14 +18,9 @@ export func empty_cache(adapters) {
 
 export func load_cache(adapters) {
     mut fresh = empty_cache(adapters)
-    if cache_directory_safe() == false { return fresh }
-    if file_exists(cache_path()) == false { return fresh }
     mut parsed = {}
     try {
-        if file_size(cache_path()) > cache_max_bytes() { return fresh }
-        let content = read_file(cache_path())
-        if utf8_byte_length(content) > cache_max_bytes() { return fresh }
-        parsed = parse_json(content)
+        parsed = parse_json(read_file_beneath(".", cache_path(), cache_max_bytes()))
     } except e { return fresh }
     if type_of(parsed) != "dict" { return fresh }
     if dict_get(parsed, "schema_version", 0) != 1 { return fresh }
@@ -87,19 +82,6 @@ export func save_cache(cache) {
     let written = write_safe(cache_path(), to_json(cache_document(cache)), true)
     if written["ok"] == false { return { "ok": false, "error": written["error"], "path": cache_path() } }
     return { "ok": true, "error": "", "path": cache_path() }
-}
-
-func cache_directory_safe() {
-    if path_exists(".fence") == false { return true }
-    mut absolute = ""
-    mut cwd = ""
-    try {
-        absolute = normalize_sep(path_absolute(".fence"))
-        if file_exists(cache_path()) { absolute = normalize_sep(path_absolute(cache_path())) }
-        cwd = normalize_sep(path_absolute("."))
-    } except e { return false }
-    if absolute == cwd { return true }
-    return starts_with(absolute, cwd + "/")
 }
 
 // Cache JSON is disposable input, not a trusted typed import array. Corruption

@@ -54,11 +54,10 @@ export func load_baseline() {
     if file_exists(path) == false {
         return { "found": false, "ok": true, "fingerprints": [] }
     }
-    let raw = read_file(path)
     mut parsed = {}
     mut ok = true
     try {
-        parsed = parse_json(raw)
+        parsed = parse_json(read_file_beneath(".", path, 8388608))
     } except e {
         ok = false
     }
